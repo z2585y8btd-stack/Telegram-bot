@@ -6,7 +6,9 @@ TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔥 Join Private Channel", url="https://t.me/+LIVzUK7_TxphNGZk")]
+        [InlineKeyboardButton("🔥  Channel   🔥", url="https://t.me/+LIVzUK7_TxphNGZk")],
+        [InlineKeyboardButton("👻 Snapchat - 1500 Stars", url="https://snapchat.com/add/Sela.mon")],
+        [InlineKeyboardButton("💬  Telegram Account - 1000 Stars", url="https://t.me/Sullmh")]
     ])
     await update.message.reply_text("", reply_markup=keyboard)
 
