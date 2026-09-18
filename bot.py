@@ -14,23 +14,13 @@ Click the button below to join the Private Channel and stay updated with the lat
 ⬇️ Join Now ⬇️"""
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "🔥 Private Channel",
-            url="https://t.me/+LIVzUK7_TxphNGZk"
-        )]
+        [InlineKeyboardButton("🔥 Private Channel", url="https://t.me/+LIVzUK7_TxphNGZk")]
     ])
 
-    await update.message.reply_text(
-        text,
-        reply_markup=keyboard
-    )
+    await update.message.reply_text(text, reply_markup=keyboard)
 
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 
 print("Bot is running...")
 app.run_polling()
-ثم أنشئ ملف ثاني اسمه:
-requirements.txt
-وضع فيه:
-python-telegram-bot==21.6
