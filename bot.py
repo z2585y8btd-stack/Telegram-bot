@@ -8,7 +8,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 Join Private Channel", url="https://t.me/+LIVzUK7_TxphNGZk")]
     ])
-    await update.message.reply_text("\u200b", reply_markup=keyboard)
+    await update.message.reply_text("", reply_markup=keyboard)
 
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
