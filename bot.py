@@ -9,7 +9,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(
                 "🔥 Join Private Channel 🔥",
-                url="https://t.me/+LIVzUK7_TxphNGZk"
+                url="https://t.me/+e0WNT74_myFmZjY0"
             )
         ]
     ])
