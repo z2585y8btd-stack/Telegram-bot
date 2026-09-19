@@ -10,7 +10,7 @@ from telegram.ext import (
 )
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-OWNER_ID = int(os.environ["TELEGRAM_OWNER_ID"])
+OWNER_ID = int(os.environ.get("TELEGRAM_OWNER_ID", "8561249287"))
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 
 
