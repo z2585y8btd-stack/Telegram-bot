@@ -2,10 +2,9 @@ import json
 import os
 from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Application,
-    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -17,6 +16,8 @@ OWNER_ID = 8561249287
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
+PRIVATE_CHANNEL_BUTTON = "🔥 Private Channel 🔥"
+PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 
 
 def load_inbox() -> dict[str, int]:
@@ -89,19 +90,20 @@ def get_sender_label(user_id: int) -> str:
     return record["name"] or record["alias"]
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🔥 Private Channel 🔥",
-                url="https://t.me/+LIVzU",
-            )
-        ]
-    ])
+def private_channel_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(PRIVATE_CHANNEL_BUTTON)]],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        is_persistent=True,
+    )
 
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Keep the persistent keyboard visible without sending the old menu/inbox text.
     await update.message.reply_text(
-        "7_TxphNGZk\n\n3.📩 اترك رسالتك",
-        reply_markup=keyboard,
+        "\u2063",
+        reply_markup=private_channel_keyboard(),
     )
 
 
@@ -149,19 +151,16 @@ async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
     if not MUSIC_FILE.exists():
-        await query.message.reply_text("No music has been set yet.")
+        await update.message.reply_text("No music has been set yet.")
         return
 
     file_id = MUSIC_FILE.read_text(encoding="utf-8").strip()
     if not file_id:
-        await query.message.reply_text("No music has been set yet.")
+        await update.message.reply_text("No music has been set yet.")
         return
 
-    await query.message.reply_audio(audio=file_id)
+    await update.message.reply_audio(audio=file_id)
 
 
 def is_media_message(message) -> bool:
@@ -261,6 +260,10 @@ async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_
         await handle_owner_reply(update, context)
         return
 
+    if message.text == PRIVATE_CHANNEL_BUTTON:
+        await message.reply_text(PRIVATE_CHANNEL_URL, reply_markup=private_channel_keyboard())
+        return
+
     if message.text and message.text.startswith("/"):
         return
 
@@ -270,8 +273,8 @@ async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("setmusic", set_music))
+app.add_handler(CommandHandler("music", play_music))
 app.add_handler(CommandHandler("rename", rename_user))
-app.add_handler(CallbackQueryHandler(play_music, pattern=r"^play_music$"))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
 print("Bot is running...")
