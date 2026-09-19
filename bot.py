@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -17,27 +17,26 @@ MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 PRIVATE_CHANNEL_BUTTON = "🔥 Private Channel 🔥"
-PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
+PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7"
 
 
 def load_inbox() -> dict[str, int]:
     if not INBOX_FILE.exists():
         return {}
-
     try:
         data = json.loads(INBOX_FILE.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return {}
-
-        cleaned = {}
-        for key, value in data.items():
-            try:
-                cleaned[str(key)] = int(value)
-            except (TypeError, ValueError):
-                continue
-        return cleaned
-    except (OSError, ValueError, TypeError):
+    except (OSError, TypeError, ValueError):
         return {}
+    if not isinstance(data, dict):
+        return {}
+
+    inbox = {}
+    for key, value in data.items():
+        try:
+            inbox[str(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return inbox
 
 
 def save_inbox(inbox: dict[str, int]) -> None:
@@ -49,25 +48,23 @@ def save_inbox(inbox: dict[str, int]) -> None:
 def load_aliases() -> dict[str, dict[str, str]]:
     if not ALIASES_FILE.exists():
         return {}
-
     try:
         data = json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return {}
-
-        aliases = {}
-        for user_id, record in data.items():
-            if isinstance(record, str):
-                # Accept the simple format as well as the current format.
-                aliases[str(user_id)] = {"alias": record, "name": record}
-            elif isinstance(record, dict) and record.get("alias"):
-                aliases[str(user_id)] = {
-                    "alias": str(record["alias"]),
-                    "name": str(record.get("name") or record["alias"]),
-                }
-        return aliases
-    except (OSError, ValueError, TypeError):
+    except (OSError, TypeError, ValueError):
         return {}
+    if not isinstance(data, dict):
+        return {}
+
+    aliases = {}
+    for user_id, record in data.items():
+        if isinstance(record, str):
+            aliases[str(user_id)] = {"alias": record, "name": record}
+        elif isinstance(record, dict) and record.get("alias"):
+            aliases[str(user_id)] = {
+                "alias": str(record["alias"]),
+                "name": str(record.get("name") or record["alias"]),
+            }
+    return aliases
 
 
 def save_aliases(aliases: dict[str, dict[str, str]]) -> None:
@@ -90,33 +87,31 @@ def get_sender_label(user_id: int) -> str:
     return record["name"] or record["alias"]
 
 
-def private_channel_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton(PRIVATE_CHANNEL_BUTTON)]],
-        resize_keyboard=True,
-        one_time_keyboard=False,
-        is_persistent=True,
+def private_channel_markup() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(PRIVATE_CHANNEL_BUTTON, url=PRIVATE_CHANNEL_URL)]]
     )
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Keep the persistent keyboard visible without sending the old menu/inbox text.
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Telegram requires message text when sending an inline keyboard. The URL is
+    # the actual content, not a placeholder, and the button opens it directly.
     await update.message.reply_text(
-        "\u2063",
-        reply_markup=private_channel_keyboard(),
+        PRIVATE_CHANNEL_URL,
+        reply_markup=private_channel_markup(),
     )
 
 
-async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != OWNER_ID:
         return
 
     message = update.message
     replied_to = message.reply_to_message
     audio = replied_to.audio if replied_to else None
-
     if not audio or (
-        audio.mime_type and audio.mime_type != "audio/mpeg"
+        audio.mime_type
+        and audio.mime_type != "audio/mpeg"
         and not (audio.file_name or "").lower().endswith(".mp3")
     ):
         await message.reply_text("Reply to an MP3 audio file with /setmusic.")
@@ -126,10 +121,9 @@ async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await message.reply_text("Music updated successfully.")
 
 
-async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != OWNER_ID:
         return
-
     if len(context.args) < 3 or context.args[0].lower() != "user":
         await update.message.reply_text("Usage: /rename User <number> <name>")
         return
@@ -146,11 +140,10 @@ async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_aliases(aliases)
             await update.message.reply_text(f"{alias} renamed to {new_name}.")
             return
-
     await update.message.reply_text(f"No sender found for {alias}.")
 
 
-async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not MUSIC_FILE.exists():
         await update.message.reply_text("No music has been set yet.")
         return
@@ -159,7 +152,6 @@ async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not file_id:
         await update.message.reply_text("No music has been set yet.")
         return
-
     await update.message.reply_audio(audio=file_id)
 
 
@@ -177,26 +169,19 @@ def is_media_message(message) -> bool:
 
 
 def get_message_text(message) -> str:
-    if message.text is not None:
-        return message.text
-    return message.caption or ""
+    return message.text if message.text is not None else (message.caption or "")
 
 
-async def forward_user_message_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def forward_user_message_to_owner(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     message = update.message
-    if not message:
-        return
-
     user = update.effective_user
-    if user is None:
-        return
-
-    if message.text and message.text.startswith("/"):
+    if not message or user is None or (message.text and message.text.startswith("/")):
         return
 
     sender_label = get_sender_label(user.id)
     header = f"🧑‍💻 {sender_label}"
-
     if message.text:
         forwarded_message = await context.bot.send_message(
             chat_id=OWNER_ID,
@@ -204,9 +189,7 @@ async def forward_user_message_to_owner(update: Update, context: ContextTypes.DE
         )
     elif is_media_message(message):
         content = get_message_text(message)
-        caption = header
-        if content:
-            caption += f"\n\n{content}"
+        caption = header if not content else f"{header}\n\n{content}"
         forwarded_message = await context.bot.copy_message(
             chat_id=OWNER_ID,
             from_chat_id=message.chat_id,
@@ -214,16 +197,13 @@ async def forward_user_message_to_owner(update: Update, context: ContextTypes.DE
             caption=caption[:1024],
         )
     else:
-        forwarded_message = await context.bot.send_message(
-            chat_id=OWNER_ID,
-            text=header,
-        )
+        return
 
     inbox[str(forwarded_message.message_id)] = user.id
     save_inbox(inbox)
 
 
-async def handle_owner_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_owner_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
     if not message or not message.reply_to_message:
         return
@@ -238,35 +218,21 @@ async def handle_owner_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if message.text:
         await context.bot.send_message(chat_id=recipient_id, text=message.text)
-        return
-
-    if is_media_message(message):
+    elif is_media_message(message):
         await context.bot.copy_message(
             chat_id=recipient_id,
             from_chat_id=message.chat_id,
             message_id=message.message_id,
         )
-        return
-
-    await context.bot.send_message(chat_id=recipient_id, text="Reply received.")
 
 
-async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
     if not message or update.effective_user is None:
         return
-
     if update.effective_user.id == OWNER_ID:
         await handle_owner_reply(update, context)
         return
-
-    if message.text == PRIVATE_CHANNEL_BUTTON:
-        await message.reply_text(PRIVATE_CHANNEL_URL, reply_markup=private_channel_keyboard())
-        return
-
-    if message.text and message.text.startswith("/"):
-        return
-
     await forward_user_message_to_owner(update, context)
 
 
