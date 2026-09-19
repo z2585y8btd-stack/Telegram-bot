@@ -8,8 +8,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                "🔥 Join Private Channel 🔥",
-                url="https://t.me/+e0WNT74_myFmZjY0"
+                "🔥 Private Channel 🔥",
+                url="https://t.me/+LIVzUK7_TxphNGZk"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📩 Send Anonymous Message",
+                url="https://t.me/boxxxsabot"
             )
         ]
     ])
