@@ -90,13 +90,10 @@ def private_channel_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                "✦ 𝐄𝐍𝐓𝐄𝐑 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐂𝐇𝐀𝐍𝐍𝐄𝐋 ✦",
+                "🔥 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐂𝐇𝐀𝐍𝐍𝐄𝐋 🔥",
                 url=PRIVATE_CHANNEL_URL,
             )
-        ],
-        [
-            InlineKeyboardButton("🖤 𝐁𝐋𝐀𝐂𝐊 𝐒𝐏𝐀𝐂𝐄 🖤", url=PRIVATE_CHANNEL_URL)
-        ],
+        ]
     ])
 
 
