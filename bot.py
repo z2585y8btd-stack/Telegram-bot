@@ -17,7 +17,7 @@ OWNER_ID = 8561249287
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
-PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
+PRIVATE_CHANNEL_URL = "https://t.me/+e0WNT74_myFmZjY0"
 
 
 def load_inbox() -> dict[str, int]:
