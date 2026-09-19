@@ -16,7 +16,7 @@ OWNER_ID = 8561249287
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
-PRIVATE_CHANNEL_BUTTON = "🔥 Private Channel 🔥"
+PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 
 
 def load_inbox() -> dict[str, int]:
@@ -87,19 +87,22 @@ def get_sender_label(user_id: int) -> str:
 
 
 def private_channel_markup() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [[
+    return InlineKeyboardMarkup([
+        [
             InlineKeyboardButton(
-                PRIVATE_CHANNEL_BUTTON,
-                url="https://t.me/+LIVzUK7_TxphNGZk",
+                "✦ 𝐄𝐍𝐓𝐄𝐑 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐂𝐇𝐀𝐍𝐍𝐄𝐋 ✦",
+                url=PRIVATE_CHANNEL_URL,
             )
-        ]]
-    )
+        ],
+        [
+            InlineKeyboardButton("🖤 𝐁𝐋𝐀𝐂𝐊 𝐒𝐏𝐀𝐂𝐄 🖤", url=PRIVATE_CHANNEL_URL)
+        ],
+    ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "🖤",
+        "🖤\n\n✦ أهلاً بك في مساحتك الخاصة ✦\n\nاختر طريقك بالأسفل",
         reply_markup=private_channel_markup(),
     )
 
