@@ -99,7 +99,7 @@ def private_channel_markup() -> InlineKeyboardMarkup:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "",
+        "🖤",
         reply_markup=private_channel_markup(),
     )
 
