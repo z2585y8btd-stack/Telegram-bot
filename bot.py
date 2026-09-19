@@ -19,7 +19,7 @@ INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json")
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 
 
- def load_inbox() -> dict[str, int]:
+def load_inbox() -> dict[str, int]:
     if not INBOX_FILE.exists():
         return {}
 
