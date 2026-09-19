@@ -17,7 +17,6 @@ MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 PRIVATE_CHANNEL_BUTTON = "🔥 Private Channel 🔥"
-PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 
 
 def load_inbox() -> dict[str, int]:
@@ -89,15 +88,18 @@ def get_sender_label(user_id: int) -> str:
 
 def private_channel_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(PRIVATE_CHANNEL_BUTTON, url=PRIVATE_CHANNEL_URL)]]
+        [[
+            InlineKeyboardButton(
+                PRIVATE_CHANNEL_BUTTON,
+                url="https://t.me/+LIVzUK7_TxphNGZk",
+            )
+        ]]
     )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Telegram requires message text when sending an inline keyboard. The URL is
-    # the actual content, not a placeholder, and the button opens it directly.
     await update.message.reply_text(
-        PRIVATE_CHANNEL_URL,
+        PRIVATE_CHANNEL_BUTTON,
         reply_markup=private_channel_markup(),
     )
 
