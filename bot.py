@@ -13,9 +13,10 @@ from telegram.ext import (
 )
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-OWNER_ID = OWNER_ID = 8561249287
+OWNER_ID = 8561249287
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
+ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 
 
 def load_inbox() -> dict[str, int]:
@@ -44,7 +45,48 @@ def save_inbox(inbox: dict[str, int]) -> None:
     temp_file.replace(INBOX_FILE)
 
 
+def load_aliases() -> dict[str, dict[str, str]]:
+    if not ALIASES_FILE.exists():
+        return {}
+
+    try:
+        data = json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {}
+
+        aliases = {}
+        for user_id, record in data.items():
+            if isinstance(record, str):
+                # Accept the simple format as well as the current format.
+                aliases[str(user_id)] = {"alias": record, "name": record}
+            elif isinstance(record, dict) and record.get("alias"):
+                aliases[str(user_id)] = {
+                    "alias": str(record["alias"]),
+                    "name": str(record.get("name") or record["alias"]),
+                }
+        return aliases
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def save_aliases(aliases: dict[str, dict[str, str]]) -> None:
+    temp_file = ALIASES_FILE.with_suffix(f"{ALIASES_FILE.suffix}.tmp")
+    temp_file.write_text(json.dumps(aliases, ensure_ascii=False), encoding="utf-8")
+    temp_file.replace(ALIASES_FILE)
+
+
 inbox = load_inbox()
+aliases = load_aliases()
+
+
+def get_sender_label(user_id: int) -> str:
+    key = str(user_id)
+    record = aliases.get(key)
+    if record is None:
+        record = {"alias": f"User {len(aliases) + 1}", "name": ""}
+        aliases[key] = record
+        save_aliases(aliases)
+    return record["name"] or record["alias"]
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -80,6 +122,30 @@ async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     MUSIC_FILE.write_text(audio.file_id, encoding="utf-8")
     await message.reply_text("Music updated successfully.")
+
+
+async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    if len(context.args) < 3 or context.args[0].lower() != "user":
+        await update.message.reply_text("Usage: /rename User <number> <name>")
+        return
+
+    alias = f"User {context.args[1]}"
+    new_name = " ".join(context.args[2:]).strip()
+    if not new_name:
+        await update.message.reply_text("Usage: /rename User <number> <name>")
+        return
+
+    for record in aliases.values():
+        if record["alias"].casefold() == alias.casefold():
+            record["name"] = new_name
+            save_aliases(aliases)
+            await update.message.reply_text(f"{alias} renamed to {new_name}.")
+            return
+
+    await update.message.reply_text(f"No sender found for {alias}.")
 
 
 async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -123,20 +189,23 @@ async def forward_user_message_to_owner(update: Update, context: ContextTypes.DE
         return
 
     user = update.effective_user
-    if user is None or user.id == OWNER_ID:
+    if user is None:
         return
 
     if message.text and message.text.startswith("/"):
         return
 
+    sender_label = get_sender_label(user.id)
+    header = f"📩 {sender_label}"
+
     if message.text:
         forwarded_message = await context.bot.send_message(
             chat_id=OWNER_ID,
-            text=f"📩 New Anonymous Message\n\n{message.text}",
+            text=f"{header}\n\n{message.text}",
         )
     elif is_media_message(message):
-        caption = "📩 New Anonymous Message"
         content = get_message_text(message)
+        caption = header
         if content:
             caption += f"\n\n{content}"
         forwarded_message = await context.bot.copy_message(
@@ -148,7 +217,7 @@ async def forward_user_message_to_owner(update: Update, context: ContextTypes.DE
     else:
         forwarded_message = await context.bot.send_message(
             chat_id=OWNER_ID,
-            text="📩 New Anonymous Message",
+            text=header,
         )
 
     inbox[str(forwarded_message.message_id)] = user.id
@@ -201,6 +270,7 @@ async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("setmusic", set_music))
+app.add_handler(CommandHandler("rename", rename_user))
 app.add_handler(CallbackQueryHandler(play_music, pattern="^play_music$"))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
