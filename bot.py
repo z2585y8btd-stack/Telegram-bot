@@ -5,6 +5,7 @@ from pathlib import Path
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -28,7 +29,6 @@ def load_inbox() -> dict[str, int]:
         return {}
     if not isinstance(data, dict):
         return {}
-
     inbox = {}
     for key, value in data.items():
         try:
@@ -53,7 +53,6 @@ def load_aliases() -> dict[str, dict[str, str]]:
         return {}
     if not isinstance(data, dict):
         return {}
-
     aliases = {}
     for user_id, record in data.items():
         if isinstance(record, str):
@@ -88,26 +87,28 @@ def get_sender_label(user_id: int) -> str:
 
 def private_channel_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🔥 𝐏𝐑𝐈𝐕𝐀𝐓𝐄 𝐂𝐇𝐀𝐍𝐍𝐄𝐋 🔥",
-                url=PRIVATE_CHANNEL_URL,
-            )
-        ]
+        [InlineKeyboardButton("☰ Menu", callback_data="menu")],
+        [InlineKeyboardButton("Private Channel 🔥⚡️", url=PRIVATE_CHANNEL_URL)],
     ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "🖤\n\n✦ أهلاً بك في مساحتك الخاصة ✦\n\nاختر طريقك بالأسفل",
-        reply_markup=private_channel_markup(),
-    )
+    await update.message.reply_text("🖤", reply_markup=private_channel_markup())
+
+
+async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("🖤", reply_markup=private_channel_markup())
+
+
+async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_reply_markup(reply_markup=private_channel_markup())
 
 
 async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != OWNER_ID:
         return
-
     message = update.message
     replied_to = message.reply_to_message
     audio = replied_to.audio if replied_to else None
@@ -118,7 +119,6 @@ async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ):
         await message.reply_text("Reply to an MP3 audio file with /setmusic.")
         return
-
     MUSIC_FILE.write_text(audio.file_id, encoding="utf-8")
     await message.reply_text("Music updated successfully.")
 
@@ -129,13 +129,11 @@ async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if len(context.args) < 3 or context.args[0].lower() != "user":
         await update.message.reply_text("Usage: /rename User <number> <name>")
         return
-
     alias = f"User {context.args[1]}"
     new_name = " ".join(context.args[2:]).strip()
     if not new_name:
         await update.message.reply_text("Usage: /rename User <number> <name>")
         return
-
     for record in aliases.values():
         if record["alias"].casefold() == alias.casefold():
             record["name"] = new_name
@@ -149,7 +147,6 @@ async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not MUSIC_FILE.exists():
         await update.message.reply_text("No music has been set yet.")
         return
-
     file_id = MUSIC_FILE.read_text(encoding="utf-8").strip()
     if not file_id:
         await update.message.reply_text("No music has been set yet.")
@@ -159,14 +156,8 @@ async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 def is_media_message(message) -> bool:
     return bool(
-        message.photo
-        or message.video
-        or message.document
-        or message.audio
-        or message.voice
-        or message.video_note
-        or message.animation
-        or message.sticker
+        message.photo or message.video or message.document or message.audio
+        or message.voice or message.video_note or message.animation or message.sticker
     )
 
 
@@ -174,33 +165,24 @@ def get_message_text(message) -> str:
     return message.text if message.text is not None else (message.caption or "")
 
 
-async def forward_user_message_to_owner(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def forward_user_message_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
     user = update.effective_user
     if not message or user is None or (message.text and message.text.startswith("/")):
         return
-
     sender_label = get_sender_label(user.id)
     header = f"🧑‍💻 {sender_label}"
     if message.text:
-        forwarded_message = await context.bot.send_message(
-            chat_id=OWNER_ID,
-            text=f"{header}\n\n{message.text}",
-        )
+        forwarded_message = await context.bot.send_message(chat_id=OWNER_ID, text=f"{header}\n\n{message.text}")
     elif is_media_message(message):
         content = get_message_text(message)
         caption = header if not content else f"{header}\n\n{content}"
         forwarded_message = await context.bot.copy_message(
-            chat_id=OWNER_ID,
-            from_chat_id=message.chat_id,
-            message_id=message.message_id,
-            caption=caption[:1024],
+            chat_id=OWNER_ID, from_chat_id=message.chat_id,
+            message_id=message.message_id, caption=caption[:1024],
         )
     else:
         return
-
     inbox[str(forwarded_message.message_id)] = user.id
     save_inbox(inbox)
 
@@ -209,21 +191,17 @@ async def handle_owner_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
     message = update.message
     if not message or not message.reply_to_message:
         return
-
     replied_message = message.reply_to_message
     if replied_message.from_user is None or replied_message.from_user.id != context.bot.id:
         return
-
     recipient_id = inbox.get(str(replied_message.message_id))
     if recipient_id is None:
         return
-
     if message.text:
         await context.bot.send_message(chat_id=recipient_id, text=message.text)
     elif is_media_message(message):
         await context.bot.copy_message(
-            chat_id=recipient_id,
-            from_chat_id=message.chat_id,
+            chat_id=recipient_id, from_chat_id=message.chat_id,
             message_id=message.message_id,
         )
 
@@ -240,9 +218,11 @@ async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_
 
 app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("menu", menu))
 app.add_handler(CommandHandler("setmusic", set_music))
 app.add_handler(CommandHandler("music", play_music))
 app.add_handler(CommandHandler("rename", rename_user))
+app.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu$"))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
 print("Bot is running...")
