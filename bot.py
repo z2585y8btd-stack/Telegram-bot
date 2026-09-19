@@ -97,7 +97,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(
-        "KeyboardMarkup📩 اترك رسالتك",
+        "main branch.📩 اترك رسالتك",
         reply_markup=reply_keyboard,
     )
 
@@ -106,10 +106,16 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                "🔥 Private Channel 🔥",
-                url="https://t.me/+LIVzUK7_TxphNGZk"
+                "☰ Menu",
+                callback_data="menu",
             )
-        ]
+        ],
+        [
+            InlineKeyboardButton(
+                "📢 Private Channel",
+                url="https://t.me/yourchannel",
+            )
+        ],
     ])
 
     await update.message.reply_text("Menu", reply_markup=keyboard)
@@ -206,7 +212,7 @@ async def forward_user_message_to_owner(update: Update, context: ContextTypes.DE
         return
 
     sender_label = get_sender_label(user.id)
-    header = f"📩 {sender_label}"
+    header = f"🧑‍💻 {sender_label}"
 
     if message.text:
         forwarded_message = await context.bot.send_message(
@@ -281,7 +287,7 @@ app = Application.builder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("setmusic", set_music))
 app.add_handler(CommandHandler("rename", rename_user))
-app.add_handler(CallbackQueryHandler(play_music, pattern="^play_music$"))
+app.add_handler(CallbackQueryHandler(play_music, pattern=r"^play_music$"))
 app.add_handler(MessageHandler(filters.Regex(r"^☰ Menu$"), show_menu))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
