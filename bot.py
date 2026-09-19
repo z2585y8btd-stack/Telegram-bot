@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -19,7 +19,7 @@ INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json")
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 
 
-def load_inbox() -> dict[str, int]:
+ def load_inbox() -> dict[str, int]:
     if not INBOX_FILE.exists():
         return {}
 
@@ -90,6 +90,19 @@ def get_sender_label(user_id: int) -> str:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reply_keyboard = ReplyKeyboardMarkup(
+        [["☰ Menu"]],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
+
+    await update.message.reply_text(
+        "KeyboardMarkup📩 اترك رسالتك",
+        reply_markup=reply_keyboard,
+    )
+
+
+async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -99,10 +112,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     ])
 
-    await update.message.reply_text(
-        "⭐ Welcome to SullfitBot ⭐",
-        reply_markup=keyboard
-    )
+    await update.message.reply_text("Menu", reply_markup=keyboard)
 
 
 async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -272,6 +282,7 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("setmusic", set_music))
 app.add_handler(CommandHandler("rename", rename_user))
 app.add_handler(CallbackQueryHandler(play_music, pattern="^play_music$"))
+app.add_handler(MessageHandler(filters.Regex(r"^☰ Menu$"), show_menu))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
 print("Bot is running...")
