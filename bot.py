@@ -29,8 +29,8 @@ CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
 SNAPCHAT_USERNAME = "Sela.mon"
-SNAPCHAT_PRICE = 250
-SNAPCHAT_PAYLOAD_PREFIX = "snapchat_250_stars"
+SNAPCHAT_PRICE = 100
+SNAPCHAT_PAYLOAD_PREFIX = "snapchat_100_stars"
 MAX_HISTORY_MESSAGES = 20
 OPENAI_QUOTA_ERROR_CODES = {"insufficient_quota", "credit_balance_exhausted"}
 
@@ -137,7 +137,7 @@ async def create_snapchat_invoice(update: Update, context: ContextTypes.DEFAULT_
     try:
         await query.message.reply_invoice(
             title="Snapchat 👻",
-            description="Snapchat account — 250 ⭐️",
+            description="Snapchat account — 100 ⭐️",
             payload=payload,
             currency="XTR",
             prices=[LabeledPrice("Snapchat 👻", SNAPCHAT_PRICE)],
@@ -180,7 +180,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         await message.get_bot().send_message(
             chat_id=ADMIN_ID,
-            text=f"💰 عملية شراء Snapchat\nالمستخدم: {message.from_user.id}\nالمبلغ: 250 نجمة\nCharge ID: {payment.telegram_payment_charge_id}",
+            text=f"💰 عملية شراء Snapchat\nالمستخدم: {message.from_user.id}\nالمبلغ: 100 نجمة\nCharge ID: {payment.telegram_payment_charge_id}",
         )
     except Exception:
         logger.exception("Could not notify admin")
