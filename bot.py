@@ -85,7 +85,7 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📣 انضم الآن إلى القناة", url=CHANNEL_URL)],
-        [InlineKeyboardButton("Snapchat 👻 — 250 ⭐️", callback_data=SNAPCHAT_CALLBACK)],
+        [InlineKeyboardButton("Snapchat 👻", callback_data=SNAPCHAT_CALLBACK)],
         [InlineKeyboardButton("✉️ إرسال رسالة لصاحب البوت", callback_data=CONTACT_ADMIN_CALLBACK)],
     ])
 
@@ -219,7 +219,7 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
         await message.copy(chat_id=int(recipient_id))
         await message.reply_text("تم إرسال الرد ✅")
     except Exception:
-        await message.reply_text("ما قدرت أرسل الرد؛ يمكن المستخدم حظر البوت.")
+        await message.reply_text("ما قدرت أرسل الرد؛ يم��ن المستخدم حظر البوت.")
     return True
 
 
@@ -291,7 +291,7 @@ async def forward_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def set_commands(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand("start", "بدء البوت"), BotCommand("channel", "رابط القناة"),
-        BotCommand("rename", "تغيير اسم شخص - للمالك ��قط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
+        BotCommand("rename", "تغيير اسم شخص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
     ])
 
 
