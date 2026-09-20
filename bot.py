@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.getenv("AISELAMONBOT_TOKEN")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ADMIN_ID = int(os.getenv("BOT_ADMIN_ID", "8561249287"))
@@ -291,13 +291,13 @@ async def forward_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def set_commands(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand("start", "بدء البوت"), BotCommand("channel", "رابط القناة"),
-        BotCommand("rename", "تغيير اسم شخص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
+        BotCommand("rename", "تغيير اسم ش��ص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
     ])
 
 
 def main() -> None:
     if not BOT_TOKEN:
-        raise RuntimeError("The AISELAMONBOT_TOKEN environment secret is not set")
+        raise RuntimeError("The TELEGRAM_BOT_TOKEN environment secret is not set")
     application = Application.builder().token(BOT_TOKEN).post_init(set_commands).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("channel", send_channel_link))
