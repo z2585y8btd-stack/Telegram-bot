@@ -24,7 +24,7 @@ PROTECT_CONTENT = True
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
-PRIVATE_CHANNEL_URL = "https://t.me/+e0WNT74_myFmZjY0"
+PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 CHANNEL_BUTTON_TEXT = "🔥 JOIN THE PRIVATE CHANNEL 🔥"
 
 
@@ -109,7 +109,7 @@ def channel_link_markup() -> InlineKeyboardMarkup:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "",
+        "Welcome! اختر من القائمة بالأسفل للمتابعة.",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -117,7 +117,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "",
+        "القائمة الرئيسية:",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
