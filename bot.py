@@ -2,7 +2,13 @@ import json
 import os
 from pathlib import Path
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    Update,
+)
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -19,6 +25,7 @@ MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 PRIVATE_CHANNEL_URL = "https://t.me/+e0WNT74_myFmZjY0"
+CHANNEL_BUTTON_TEXT = "الدخول إلى القناة الخاصة"
 
 
 def load_inbox() -> dict[str, int]:
@@ -86,21 +93,42 @@ def get_sender_label(user_id: int) -> str:
     return record["name"] or record["alias"]
 
 
-def private_channel_markup() -> InlineKeyboardMarkup:
+def private_channel_markup() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(CHANNEL_BUTTON_TEXT)]],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
+
+
+def channel_link_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Private Channel 🔥⚡️", url=PRIVATE_CHANNEL_URL)],
+        [InlineKeyboardButton("اضغط هنا للدخول ✨", url=PRIVATE_CHANNEL_URL)],
     ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "🖤", reply_markup=private_channel_markup(), protect_content=PROTECT_CONTENT
+        "🖤",
+        reply_markup=private_channel_markup(),
+        protect_content=PROTECT_CONTENT,
     )
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "🖤", reply_markup=private_channel_markup(), protect_content=PROTECT_CONTENT
+        "🖤",
+        reply_markup=private_channel_markup(),
+        protect_content=PROTECT_CONTENT,
+    )
+
+
+async def channel_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "<b><i>اضغط هنا للدخول ✨</i></b>",
+        reply_markup=channel_link_markup(),
+        parse_mode="HTML",
+        protect_content=PROTECT_CONTENT,
     )
 
 
@@ -268,6 +296,7 @@ app.add_handler(CommandHandler("menu", menu))
 app.add_handler(CommandHandler("setmusic", set_music))
 app.add_handler(CommandHandler("music", play_music))
 app.add_handler(CommandHandler("rename", rename_user))
+app.add_handler(MessageHandler(filters.Regex(f"^{CHANNEL_BUTTON_TEXT}$"), channel_button))
 app.add_handler(CallbackQueryHandler(play_music_callback, pattern="^play_music$"))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
