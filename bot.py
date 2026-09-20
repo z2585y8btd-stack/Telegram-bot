@@ -137,7 +137,7 @@ async def create_snapchat_invoice(update: Update, context: ContextTypes.DEFAULT_
     try:
         await query.message.reply_invoice(
             title="Snapchat 👻",
-            description="Snapchat account — 100 ⭐️",
+            description="Snapchat account",
             payload=payload,
             currency="XTR",
             prices=[LabeledPrice("Snapchat 👻", SNAPCHAT_PRICE)],
