@@ -85,7 +85,7 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📣 انضم الآن إلى القناة", url=CHANNEL_URL)],
-        [InlineKeyboardButton("احصل على Snapchat مالك البوت", callback_data=SNAPCHAT_CALLBACK)],
+        [InlineKeyboardButton("Snapchat 👻 — 100 ⭐️", callback_data=SNAPCHAT_CALLBACK)],
         [InlineKeyboardButton("✉️ إرسال رسالة لصاحب البوت", callback_data=CONTACT_ADMIN_CALLBACK)],
     ])
 
@@ -136,11 +136,11 @@ async def create_snapchat_invoice(update: Update, context: ContextTypes.DEFAULT_
     payload = f"{SNAPCHAT_PAYLOAD_PREFIX}:{query.from_user.id}:{uuid4().hex}"
     try:
         await query.message.reply_invoice(
-            title="Snapchat account",
+            title="Snapchat 👻",
             description="Snapchat account — 100 ⭐️",
             payload=payload,
             currency="XTR",
-            prices=[LabeledPrice("Snapchat account", SNAPCHAT_PRICE)],
+            prices=[LabeledPrice("Snapchat 👻", SNAPCHAT_PRICE)],
             provider_token="",
             start_parameter="snapchat-sela-mon",
         )
