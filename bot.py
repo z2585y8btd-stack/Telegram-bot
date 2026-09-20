@@ -109,7 +109,7 @@ def channel_link_markup() -> InlineKeyboardMarkup:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Welcome! اختر من القائمة بالأسفل للمتابعة.",
+        "Hi 👻",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
