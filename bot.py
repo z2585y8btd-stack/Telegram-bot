@@ -86,7 +86,7 @@ def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("💀𝗣𝗥𝗜𝗩𝗔𝗧𝗘 𝗖𝗛𝗔𝗡𝗡𝗘𝗟💀", url=CHANNEL_URL)],
         [InlineKeyboardButton("Snapchat 👻", callback_data=SNAPCHAT_CALLBACK)],
-        [InlineKeyboardButton("Send a massage to Support 🦹🏻‍♀️", callback_data=CONTACT_ADMIN_CALLBACK)],
+        [InlineKeyboardButton("Send me a message🦹🏻‍♀️", callback_data=CONTACT_ADMIN_CALLBACK)],
     ])
 
 
