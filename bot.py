@@ -100,23 +100,23 @@ def fallback_reply(text: str) -> str:
     if is_type_question(text):
         return "انا بوت اقصد بوث 😝"
     if any(word in lowered for word in ("هلا", "مرحبا", "السلام", "hello")):
-        return "يا هلا والله 🧡 نورت!"
+        return " 🧡 نورت!"
     if "شكرا" in lowered or "مشكور" in lowered:
-        return "العفو يا بعدي 🥹"
+        return "العفو  🥹"
     if "كيفك" in lowered or "شلونك" in lowered:
-        return "بخير دامك بخير 🔥"
-    return "أبشر يا بعدي 🧡 اكتب طلبك وبحاول أفيدك."
+        return "بخير  🔥"
+    return " 🧡 اكتب طلبك وبحاول أفيدك."
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
         context.user_data["ai_history"] = []
-        await update.message.reply_text("نورت 👀", reply_markup=main_keyboard())
+        await update.message.reply_text("MY ZONE🧞‍♂️", reply_markup=main_keyboard())
 
 
 async def send_channel_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
-        await update.message.reply_text("نورت 👀", reply_markup=main_keyboard())
+        await update.message.reply_text("MY ZONE🧞‍♂️", reply_markup=main_keyboard())
 
 
 async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -125,7 +125,7 @@ async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     await query.answer()
     context.user_data["awaiting_admin_message"] = True
-    await query.message.reply_text("اكتب رسالتك الحين، وبوصلها لصاحب البوت ويرد عليك 🧡")
+    await query.message.reply_text("اكتب رسالتك ")
 
 
 async def create_snapchat_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
