@@ -25,7 +25,7 @@ MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 PRIVATE_CHANNEL_URL = "https://t.me/+e0WNT74_myFmZjY0"
-CHANNEL_BUTTON_TEXT = "الدخول إلى القناة الخاصة"
+CHANNEL_BUTTON_TEXT = "🔥 JOIN THE PRIVATE CHANNEL 🔥"
 
 
 def load_inbox() -> dict[str, int]:
@@ -103,13 +103,13 @@ def private_channel_markup() -> ReplyKeyboardMarkup:
 
 def channel_link_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("اضغط هنا للدخول ✨", url=PRIVATE_CHANNEL_URL)],
+        [InlineKeyboardButton("Klick here ⚡️", url=PRIVATE_CHANNEL_URL)],
     ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "🖤",
+        "",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -117,7 +117,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "🖤",
+        "",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -125,9 +125,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def channel_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "<b><i>اضغط هنا للدخول ✨</i></b>",
+        "Channel 📽️🔥",
         reply_markup=channel_link_markup(),
-        parse_mode="HTML",
         protect_content=PROTECT_CONTENT,
     )
 
