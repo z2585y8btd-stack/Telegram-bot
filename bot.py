@@ -84,9 +84,9 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📣 انضم الآن إلى القناة", url=CHANNEL_URL)],
+        [InlineKeyboardButton("💀 Private Channel", url=CHANNEL_URL)],
         [InlineKeyboardButton("Snapchat 👻", callback_data=SNAPCHAT_CALLBACK)],
-        [InlineKeyboardButton("✉️ إرسال رسالة لصاحب البوت", callback_data=CONTACT_ADMIN_CALLBACK)],
+        [InlineKeyboardButton("Send a massage to Support 🦹🏻‍♀️", callback_data=CONTACT_ADMIN_CALLBACK)],
     ])
 
 
