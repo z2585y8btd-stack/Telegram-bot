@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 
 from telegram import (
@@ -25,7 +26,10 @@ MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
-CHANNEL_BUTTON_TEXT = "🔥 JOIN THE PRIVATE CHANNEL 🔥"
+CHANNEL_BUTTON_TEXT = "🔥 Join"
+# Keep accepting the previous long button text for users who still have it
+# cached in their Telegram keyboard.
+LEGACY_CHANNEL_BUTTON_TEXT = "🔥 JOIN THE PRIVATE CHANNEL 🔥"
 
 
 def load_inbox() -> dict[str, int]:
@@ -109,7 +113,7 @@ def channel_link_markup() -> InlineKeyboardMarkup:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Hi 👻",
+        "Hi 👻\nاضغط على زر 🔥 Join لفتح القناة الخاصة.",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -124,7 +128,10 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def channel_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Telegram requires non-empty text for sendMessage. The old code sent only
+    # a keyboard, so pressing the button could fail before showing the link.
     await update.message.reply_text(
+        "Private Channel",
         reply_markup=channel_link_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -294,7 +301,14 @@ app.add_handler(CommandHandler("menu", menu))
 app.add_handler(CommandHandler("setmusic", set_music))
 app.add_handler(CommandHandler("music", play_music))
 app.add_handler(CommandHandler("rename", rename_user))
-app.add_handler(MessageHandler(filters.Regex(f"^{CHANNEL_BUTTON_TEXT}$"), channel_button))
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & filters.Regex(
+            rf"^(?:{re.escape(CHANNEL_BUTTON_TEXT)}|{re.escape(LEGACY_CHANNEL_BUTTON_TEXT)})$"
+        ),
+        channel_button,
+    )
+)
 app.add_handler(CallbackQueryHandler(play_music_callback, pattern="^play_music$"))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
