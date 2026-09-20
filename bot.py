@@ -1,319 +1,316 @@
 import json
+import logging
 import os
-import re
 from pathlib import Path
+from typing import Any, Optional
+from uuid import uuid4
 
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-    Update,
-)
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Update
+from telegram.constants import ChatAction
 from telegram.ext import (
-    Application,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
+    Application, CallbackQueryHandler, CommandHandler, ContextTypes,
+    MessageHandler, PreCheckoutQueryHandler, filters,
 )
 
-TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-OWNER_ID = 8561249287
-PROTECT_CONTENT = True
-MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
-INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
-ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
-PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
-CHANNEL_BUTTON_TEXT = "🔐 دخول القناة | 30 يومًا"
-# Keep accepting the previous button texts for users who still have them cached
-# in their Telegram keyboard.
-LEGACY_CHANNEL_BUTTON_TEXTS = (
-    "🔥 Join",
-    "🔥 JOIN THE PRIVATE CHANNEL 🔥",
-)
+try:
+    from openai import AsyncOpenAI
+except ImportError:  # pragma: no cover
+    AsyncOpenAI = None
+
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+BOT_TOKEN = os.getenv("AISELAMONBOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+ADMIN_ID = int(os.getenv("BOT_ADMIN_ID", "8561249287"))
+USER_STORE_FILE = Path(os.getenv("USER_STORE_FILE", "bot_users.json"))
+CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
+CONTACT_ADMIN_CALLBACK = "contact_admin"
+SNAPCHAT_CALLBACK = "buy_snapchat"
+SNAPCHAT_USERNAME = "Sela.mon"
+SNAPCHAT_PRICE = 100
+SNAPCHAT_PAYLOAD_PREFIX = "snapchat_100_stars"
+MAX_HISTORY_MESSAGES = 20
+OPENAI_QUOTA_ERROR_CODES = {"insufficient_quota", "credit_balance_exhausted"}
+
+SYSTEM_PROMPT = """أنت مساعد تيليجرام سعودي ذكي ولطيف وخفيف دم.
+أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية، وكن مفيدًا ولطيفًا.
+إذا سأل المستخدم وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
+لا تستخدم محتوى جنسيًا صريحًا أو يستغل القاصرين أو يتضمن إكراهًا."""
+
+client: Optional[AsyncOpenAI] = None
+if OPENAI_API_KEY and AsyncOpenAI:
+    client = AsyncOpenAI(api_key=OPENAI_API_KEY, timeout=45.0, max_retries=2)
 
 
-def load_inbox() -> dict[str, int]:
-    if not INBOX_FILE.exists():
-        return {}
+def load_store() -> dict[str, Any]:
+    default = {"next_person": 1, "users": {}, "admin_messages": {}, "payments": []}
     try:
-        data = json.loads(INBOX_FILE.read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    inbox = {}
-    for key, value in data.items():
-        try:
-            inbox[str(key)] = int(value)
-        except (TypeError, ValueError):
-            continue
-    return inbox
+        if USER_STORE_FILE.exists():
+            default.update(json.loads(USER_STORE_FILE.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError):
+        logger.exception("Could not load user store")
+    default.setdefault("payments", [])
+    return default
 
 
-def save_inbox(inbox: dict[str, int]) -> None:
-    temp_file = INBOX_FILE.with_suffix(f"{INBOX_FILE.suffix}.tmp")
-    temp_file.write_text(json.dumps(inbox), encoding="utf-8")
-    temp_file.replace(INBOX_FILE)
+STORE = load_store()
 
 
-def load_aliases() -> dict[str, dict[str, str]]:
-    if not ALIASES_FILE.exists():
-        return {}
-    try:
-        data = json.loads(ALIASES_FILE.read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    aliases = {}
-    for user_id, record in data.items():
-        if isinstance(record, str):
-            aliases[str(user_id)] = {"alias": record, "name": record}
-        elif isinstance(record, dict) and record.get("alias"):
-            aliases[str(user_id)] = {
-                "alias": str(record["alias"]),
-                "name": str(record.get("name") or record["alias"]),
-            }
-    return aliases
+def save_store() -> None:
+    temporary = USER_STORE_FILE.with_suffix(".tmp")
+    temporary.write_text(json.dumps(STORE, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(USER_STORE_FILE)
 
 
-def save_aliases(aliases: dict[str, dict[str, str]]) -> None:
-    temp_file = ALIASES_FILE.with_suffix(f"{ALIASES_FILE.suffix}.tmp")
-    temp_file.write_text(json.dumps(aliases, ensure_ascii=False), encoding="utf-8")
-    temp_file.replace(ALIASES_FILE)
+def display_name(record: dict[str, Any]) -> str:
+    return record.get("name") or f"شخص {record['person_number']}"
 
 
-inbox = load_inbox()
-aliases = load_aliases()
-
-
-def get_sender_label(user_id: int) -> str:
+def user_record(user_id: int, user: Any) -> dict[str, Any]:
     key = str(user_id)
-    record = aliases.get(key)
-    if record is None:
-        record = {"alias": f"User {len(aliases) + 1}", "name": ""}
-        aliases[key] = record
-        save_aliases(aliases)
-    return record["name"] or record["alias"]
+    record = STORE["users"].get(key)
+    if not record:
+        number = int(STORE["next_person"])
+        STORE["next_person"] = number + 1
+        record = {"person_number": number, "name": f"شخص {number}", "user_id": user_id}
+        STORE["users"][key] = record
+    record["username"] = user.username or ""
+    record["first_name"] = user.first_name or ""
+    save_store()
+    return record
 
 
-def private_channel_markup() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton(CHANNEL_BUTTON_TEXT)]],
-        resize_keyboard=True,
-        is_persistent=True,
-    )
-
-
-def channel_link_markup() -> InlineKeyboardMarkup:
+def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔓 الدخول لمدة 30 يومًا", url=PRIVATE_CHANNEL_URL)],
+        [InlineKeyboardButton("📣 انضم الآن إلى القناة", url=CHANNEL_URL)],
+        [InlineKeyboardButton("احصل على Snapchat مالك البوت", callback_data=SNAPCHAT_CALLBACK)],
+        [InlineKeyboardButton("✉️ إرسال رسالة لصاحب البوت", callback_data=CONTACT_ADMIN_CALLBACK)],
     ])
 
 
+def is_type_question(text: str) -> bool:
+    normalized = " ".join(text.strip().lower().split())
+    return any(p in normalized for p in ("وش نوعك", "وش انت", "وش أنت", "ما نوعك", "ايش نوعك", "إيش نوعك"))
+
+
+def fallback_reply(text: str) -> str:
+    lowered = text.strip().lower()
+    if is_type_question(text):
+        return "انا بوت اقصد بوث 😝"
+    if any(word in lowered for word in ("هلا", "مرحبا", "السلام", "hello")):
+        return "يا هلا والله 🧡 نورت!"
+    if "شكرا" in lowered or "مشكور" in lowered:
+        return "العفو يا بعدي 🥹"
+    if "كيفك" in lowered or "شلونك" in lowered:
+        return "بخير دامك بخير 🔥"
+    return "أبشر يا بعدي 🧡 اكتب طلبك وبحاول أفيدك."
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "أهلًا بك 👋\nللدخول إلى القناة الخاصة، اشترك لمدة 30 يومًا ثم اضغط الزر بالأسفل.",
-        reply_markup=private_channel_markup(),
-        protect_content=PROTECT_CONTENT,
-    )
+    if update.message:
+        context.user_data["ai_history"] = []
+        await update.message.reply_text("نورت 🧡", reply_markup=main_keyboard())
 
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "اختر الدخول إلى القناة الخاصة لمدة 30 يومًا:",
-        reply_markup=private_channel_markup(),
-        protect_content=PROTECT_CONTENT,
-    )
+async def send_channel_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message:
+        await update.message.reply_text("حياك الله بالقناة 🧡\nاضغط الزر للدخول:", reply_markup=main_keyboard())
 
 
-async def channel_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Telegram requires non-empty text for sendMessage. The old code sent only
-    # a keyboard, so pressing the button could fail before showing the link.
-    await update.message.reply_text(
-        "💎 اشتراكك يتيح لك الدخول إلى القناة لمدة 30 يومًا.\n\nاضغط الزر للمتابعة 👇",
-        reply_markup=channel_link_markup(),
-        protect_content=PROTECT_CONTENT,
-    )
-
-
-async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_user.id != OWNER_ID:
-        return
-    message = update.message
-    replied_to = message.reply_to_message
-    audio = replied_to.audio if replied_to else None
-    if not audio or (
-        audio.mime_type
-        and audio.mime_type != "audio/mpeg"
-        and not (audio.file_name or "").lower().endswith(".mp3")
-    ):
-        await message.reply_text(
-            "Reply to an MP3 audio file with /setmusic.", protect_content=PROTECT_CONTENT
-        )
-        return
-    MUSIC_FILE.write_text(audio.file_id, encoding="utf-8")
-    await message.reply_text(
-        "Music updated successfully.", protect_content=PROTECT_CONTENT
-    )
-
-
-async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_user.id != OWNER_ID:
-        return
-    if len(context.args) < 3 or context.args[0].lower() != "user":
-        await update.message.reply_text(
-            "Usage: /rename User <number> <name>", protect_content=PROTECT_CONTENT
-        )
-        return
-    alias = f"User {context.args[1]}"
-    new_name = " ".join(context.args[2:]).strip()
-    if not new_name:
-        await update.message.reply_text(
-            "Usage: /rename User <number> <name>", protect_content=PROTECT_CONTENT
-        )
-        return
-    for record in aliases.values():
-        if record["alias"].casefold() == alias.casefold():
-            record["name"] = new_name
-            save_aliases(aliases)
-            await update.message.reply_text(
-                f"{alias} renamed to {new_name}.", protect_content=PROTECT_CONTENT
-            )
-            return
-    await update.message.reply_text(
-        f"No sender found for {alias}.", protect_content=PROTECT_CONTENT
-    )
-
-
-async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not MUSIC_FILE.exists():
-        await update.message.reply_text(
-            "No music has been set yet.", protect_content=PROTECT_CONTENT
-        )
-        return
-    file_id = MUSIC_FILE.read_text(encoding="utf-8").strip()
-    if not file_id:
-        await update.message.reply_text(
-            "No music has been set yet.", protect_content=PROTECT_CONTENT
-        )
-        return
-    await update.message.reply_audio(audio=file_id, protect_content=PROTECT_CONTENT)
-
-
-async def play_music_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if not query or not query.message:
+        return
     await query.answer()
+    context.user_data["awaiting_admin_message"] = True
+    await query.message.reply_text("اكتب رسالتك الحين، وبوصلها لصاحب البوت ويرد عليك 🧡")
 
-    if not MUSIC_FILE.exists():
-        await query.message.reply_text(
-            "No music has been set yet.", protect_content=PROTECT_CONTENT
-        )
+
+async def create_snapchat_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query or not query.message or not query.from_user:
         return
-
-    file_id = MUSIC_FILE.read_text(encoding="utf-8").strip()
-    if not file_id:
-        await query.message.reply_text(
-            "No music has been set yet.", protect_content=PROTECT_CONTENT
+    await query.answer()
+    payload = f"{SNAPCHAT_PAYLOAD_PREFIX}:{query.from_user.id}:{uuid4().hex}"
+    try:
+        await query.message.reply_invoice(
+            title="Snapchat account",
+            description="Snapchat account — 100 ⭐️",
+            payload=payload,
+            currency="XTR",
+            prices=[LabeledPrice("Snapchat account", SNAPCHAT_PRICE)],
+            provider_token="",
+            start_parameter="snapchat-sela-mon",
         )
+    except Exception:
+        logger.exception("Could not create Stars invoice")
+        await query.message.reply_text("تعذر فتح الدفع الآن. تأكد أن البوت محدث ومفعل على Telegram Stars.")
+
+
+async def precheckout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.pre_checkout_query
+    if not query:
         return
-
-    await query.message.reply_audio(audio=file_id, protect_content=PROTECT_CONTENT)
-
-
-def is_media_message(message) -> bool:
-    return bool(
-        message.photo or message.video or message.document or message.audio
-        or message.voice or message.video_note or message.animation or message.sticker
-    )
-
-
-def get_message_text(message) -> str:
-    return message.text if message.text is not None else (message.caption or "")
-
-
-async def forward_user_message_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.message
-    user = update.effective_user
-    if not message or user is None or (message.text and message.text.startswith("/")):
-        return
-    sender_label = get_sender_label(user.id)
-    header = f"🧑‍💻 {sender_label}"
-    if message.text:
-        forwarded_message = await context.bot.send_message(
-            chat_id=OWNER_ID,
-            text=f"{header}\n\n{message.text}",
-            protect_content=PROTECT_CONTENT,
-        )
-    elif is_media_message(message):
-        content = get_message_text(message)
-        caption = header if not content else f"{header}\n\n{content}"
-        forwarded_message = await context.bot.copy_message(
-            chat_id=OWNER_ID,
-            from_chat_id=message.chat_id,
-            message_id=message.message_id,
-            caption=caption[:1024],
-            protect_content=PROTECT_CONTENT,
-        )
+    valid = (query.currency == "XTR" and query.total_amount == SNAPCHAT_PRICE and
+             query.invoice_payload.startswith(SNAPCHAT_PAYLOAD_PREFIX + ":"))
+    if valid:
+        await query.answer(ok=True)
     else:
-        return
-    inbox[str(forwarded_message.message_id)] = user.id
-    save_inbox(inbox)
+        await query.answer(ok=False, error_message="بيانات الدفع غير صحيحة، حاول مرة أخرى.")
 
 
-async def handle_owner_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
-    if not message or not message.reply_to_message:
+    payment = message.successful_payment if message else None
+    if not message or not payment or not message.from_user:
         return
-    replied_message = message.reply_to_message
-    if replied_message.from_user is None or replied_message.from_user.id != context.bot.id:
+    if payment.currency != "XTR" or payment.total_amount != SNAPCHAT_PRICE:
         return
-    recipient_id = inbox.get(str(replied_message.message_id))
-    if recipient_id is None:
-        return
-    if message.text:
-        await context.bot.send_message(
-            chat_id=recipient_id, text=message.text, protect_content=PROTECT_CONTENT
+    record = {
+        "product": "snapchat", "user_id": message.from_user.id,
+        "username": message.from_user.username or "", "amount": payment.total_amount,
+        "currency": payment.currency,
+        "telegram_payment_charge_id": payment.telegram_payment_charge_id,
+    }
+    STORE["payments"].append(record)
+    save_store()
+    await message.reply_text(f"تم الدفع بنجاح ✅\n\nحساب Snapchat الخاص بك هو:\n{SNAPCHAT_USERNAME} 👻")
+    try:
+        await message.get_bot().send_message(
+            chat_id=ADMIN_ID,
+            text=f"💰 عملية شراء Snapchat\nالمستخدم: {message.from_user.id}\nالمبلغ: 100 نجمة\nCharge ID: {payment.telegram_payment_charge_id}",
         )
-    elif is_media_message(message):
-        await context.bot.copy_message(
-            chat_id=recipient_id,
-            from_chat_id=message.chat_id,
-            message_id=message.message_id,
-            protect_content=PROTECT_CONTENT,
-        )
+    except Exception:
+        logger.exception("Could not notify admin")
 
 
-async def handle_incoming_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def deliver_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     message = update.message
-    if not message or update.effective_user is None:
-        return
-    if update.effective_user.id == OWNER_ID:
-        await handle_owner_reply(update, context)
-        return
-    await forward_user_message_to_owner(update, context)
-
-
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("menu", menu))
-app.add_handler(CommandHandler("setmusic", set_music))
-app.add_handler(CommandHandler("music", play_music))
-app.add_handler(CommandHandler("rename", rename_user))
-app.add_handler(
-    MessageHandler(
-        filters.TEXT & filters.Regex(
-            rf"^(?:{re.escape(CHANNEL_BUTTON_TEXT)}|"
-            rf"{'|'.join(re.escape(text) for text in LEGACY_CHANNEL_BUTTON_TEXTS)})$"
-        ),
-        channel_button,
+    if not message or not message.from_user or message.from_user.id == ADMIN_ID:
+        return False
+    record = user_record(message.from_user.id, message.from_user)
+    username = f"\n👤 username: @{message.from_user.username}" if message.from_user.username else ""
+    header = await message.get_bot().send_message(
+        chat_id=ADMIN_ID,
+        text=f"📩 رسالة جديدة من {display_name(record)}\n🆔 ID: {message.from_user.id}{username}",
     )
-)
-app.add_handler(CallbackQueryHandler(play_music_callback, pattern="^play_music$"))
-app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
+    STORE["admin_messages"][str(header.message_id)] = message.from_user.id
+    try:
+        copied = await message.copy(chat_id=ADMIN_ID, reply_to_message_id=header.message_id)
+        STORE["admin_messages"][str(copied.message_id)] = message.from_user.id
+    except Exception:
+        logger.exception("Could not copy user message")
+    save_store()
+    await message.reply_text("وصلت رسالتك لصاحب البوت ✅ إذا رد، يوصلك الرد هنا.")
+    return True
 
-print("Bot is running...")
-app.run_polling()
+
+async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    message = update.message
+    if not message or not message.from_user or message.from_user.id != ADMIN_ID:
+        return False
+    replied = message.reply_to_message
+    recipient_id = STORE["admin_messages"].get(str(replied.message_id)) if replied else None
+    if not recipient_id:
+        return False
+    try:
+        await message.copy(chat_id=int(recipient_id))
+        await message.reply_text("تم إرسال الرد ✅")
+    except Exception:
+        await message.reply_text("ما قدرت أرسل الرد؛ يمكن المستخدم حظر البوت.")
+    return True
+
+
+async def rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.message.from_user or update.message.from_user.id != ADMIN_ID:
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text("الاستخدام: /rename <رقم الشخص أو ID> <الاسم الجديد>")
+        return
+    identifier, new_name = context.args[0], " ".join(context.args[1:]).strip()
+    record = next((item for item in STORE["users"].values() if str(item.get("person_number")) == identifier or str(item.get("user_id")) == identifier), None)
+    if not record:
+        await update.message.reply_text("ما لقيت هذا الشخص. استخدم /people لمعرفة الأرقام.")
+        return
+    record["name"] = new_name[:64]
+    save_store()
+    await update.message.reply_text(f"تم تغيير الاسم إلى: {record['name']} ✅")
+
+
+async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.message.from_user or update.message.from_user.id != ADMIN_ID:
+        return
+    records = sorted(STORE["users"].values(), key=lambda item: item["person_number"])
+    if records:
+        await update.message.reply_text("📋 الأشخاص:\n" + "\n".join(f"{display_name(x)} — ID: {x['user_id']}" for x in records))
+    else:
+        await update.message.reply_text("ما عندك متلقين مسجلين حاليًا.")
+
+
+async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global client
+    message = update.message
+    if not message or not message.text or not message.from_user:
+        return
+    if await admin_reply(update, context):
+        return
+    if context.user_data.pop("awaiting_admin_message", False) and await deliver_to_admin(update, context):
+        return
+    await message.chat.send_action(ChatAction.TYPING)
+    if any(word in message.text.lower() for word in ("رابط القناة", "لينك القناة", "رابط قناة", "channel link")):
+        await send_channel_link(update, context)
+        return
+    if is_type_question(message.text):
+        await message.reply_text("انا بوت اقصد بوث 😝")
+        return
+    reply = fallback_reply(message.text)
+    if client:
+        history = context.user_data.setdefault("ai_history", [])
+        history.append({"role": "user", "content": message.text})
+        history[:] = history[-MAX_HISTORY_MESSAGES:]
+        try:
+            result = await client.chat.completions.create(model=OPENAI_MODEL, temperature=0.7, max_tokens=600, messages=[{"role": "system", "content": SYSTEM_PROMPT}, *history])
+            reply = (result.choices[0].message.content or "").strip() or reply
+            history.append({"role": "assistant", "content": reply})
+            history[:] = history[-MAX_HISTORY_MESSAGES:]
+        except Exception:
+            logger.exception("AI request failed")
+    await message.reply_text(reply)
+
+
+async def forward_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if context.user_data.get("awaiting_admin_message"):
+        context.user_data.pop("awaiting_admin_message", None)
+        await deliver_to_admin(update, context)
+    else:
+        await admin_reply(update, context)
+
+
+async def set_commands(application: Application) -> None:
+    await application.bot.set_my_commands([
+        BotCommand("start", "بدء البوت"), BotCommand("channel", "رابط القناة"),
+        BotCommand("rename", "تغيير اسم شخص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
+    ])
+
+
+def main() -> None:
+    if not BOT_TOKEN:
+        raise RuntimeError("The AISELAMONBOT_TOKEN environment secret is not set")
+    application = Application.builder().token(BOT_TOKEN).post_init(set_commands).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("channel", send_channel_link))
+    application.add_handler(CommandHandler("rename", rename))
+    application.add_handler(CommandHandler("people", people))
+    application.add_handler(CallbackQueryHandler(contact_admin, pattern=f"^{CONTACT_ADMIN_CALLBACK}$"))
+    application.add_handler(CallbackQueryHandler(create_snapchat_invoice, pattern=f"^{SNAPCHAT_CALLBACK}$"))
+    application.add_handler(PreCheckoutQueryHandler(precheckout))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & ~filters.TEXT, forward_any_message), group=0)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, respond), group=1)
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
