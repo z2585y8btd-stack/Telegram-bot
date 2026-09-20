@@ -116,7 +116,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def send_channel_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
-        await update.message.reply_text("حياك الله بالقناة 🧡\nاضغط الزر للدخول:", reply_markup=main_keyboard())
+        await update.message.reply_text("نورت 👀", reply_markup=main_keyboard())
 
 
 async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -219,7 +219,7 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
         await message.copy(chat_id=int(recipient_id))
         await message.reply_text("تم إرسال الرد ✅")
     except Exception:
-        await message.reply_text("ما قدرت أرسل الرد؛ ��مكن المستخدم حظر البوت.")
+        await message.reply_text("ما قدرت أرسل الرد؛ يمكن المستخدم حظر البوت.")
     return True
 
 
