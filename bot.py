@@ -14,6 +14,7 @@ from telegram.ext import (
 
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 OWNER_ID = 8561249287
+PROTECT_CONTENT = True
 MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
@@ -93,11 +94,15 @@ def private_channel_markup() -> InlineKeyboardMarkup:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("🖤", reply_markup=private_channel_markup())
+    await update.message.reply_text(
+        "🖤", reply_markup=private_channel_markup(), protect_content=PROTECT_CONTENT
+    )
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("🖤", reply_markup=private_channel_markup())
+    await update.message.reply_text(
+        "🖤", reply_markup=private_channel_markup(), protect_content=PROTECT_CONTENT
+    )
 
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -117,41 +122,58 @@ async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         and audio.mime_type != "audio/mpeg"
         and not (audio.file_name or "").lower().endswith(".mp3")
     ):
-        await message.reply_text("Reply to an MP3 audio file with /setmusic.")
+        await message.reply_text(
+            "Reply to an MP3 audio file with /setmusic.",
+            protect_content=PROTECT_CONTENT,
+        )
         return
     MUSIC_FILE.write_text(audio.file_id, encoding="utf-8")
-    await message.reply_text("Music updated successfully.")
+    await message.reply_text(
+        "Music updated successfully.", protect_content=PROTECT_CONTENT
+    )
 
 
 async def rename_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != OWNER_ID:
         return
     if len(context.args) < 3 or context.args[0].lower() != "user":
-        await update.message.reply_text("Usage: /rename User <number> <name>")
+        await update.message.reply_text(
+            "Usage: /rename User <number> <name>", protect_content=PROTECT_CONTENT
+        )
         return
     alias = f"User {context.args[1]}"
     new_name = " ".join(context.args[2:]).strip()
     if not new_name:
-        await update.message.reply_text("Usage: /rename User <number> <name>")
+        await update.message.reply_text(
+            "Usage: /rename User <number> <name>", protect_content=PROTECT_CONTENT
+        )
         return
     for record in aliases.values():
         if record["alias"].casefold() == alias.casefold():
             record["name"] = new_name
             save_aliases(aliases)
-            await update.message.reply_text(f"{alias} renamed to {new_name}.")
+            await update.message.reply_text(
+                f"{alias} renamed to {new_name}.", protect_content=PROTECT_CONTENT
+            )
             return
-    await update.message.reply_text(f"No sender found for {alias}.")
+    await update.message.reply_text(
+        f"No sender found for {alias}.", protect_content=PROTECT_CONTENT
+    )
 
 
 async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not MUSIC_FILE.exists():
-        await update.message.reply_text("No music has been set yet.")
+        await update.message.reply_text(
+            "No music has been set yet.", protect_content=PROTECT_CONTENT
+        )
         return
     file_id = MUSIC_FILE.read_text(encoding="utf-8").strip()
     if not file_id:
-        await update.message.reply_text("No music has been set yet.")
+        await update.message.reply_text(
+            "No music has been set yet.", protect_content=PROTECT_CONTENT
+        )
         return
-    await update.message.reply_audio(audio=file_id)
+    await update.message.reply_audio(audio=file_id, protect_content=PROTECT_CONTENT)
 
 
 def is_media_message(message) -> bool:
@@ -173,13 +195,20 @@ async def forward_user_message_to_owner(update: Update, context: ContextTypes.DE
     sender_label = get_sender_label(user.id)
     header = f"🧑‍💻 {sender_label}"
     if message.text:
-        forwarded_message = await context.bot.send_message(chat_id=OWNER_ID, text=f"{header}\n\n{message.text}")
+        forwarded_message = await context.bot.send_message(
+            chat_id=OWNER_ID,
+            text=f"{header}\n\n{message.text}",
+            protect_content=PROTECT_CONTENT,
+        )
     elif is_media_message(message):
         content = get_message_text(message)
         caption = header if not content else f"{header}\n\n{content}"
         forwarded_message = await context.bot.copy_message(
-            chat_id=OWNER_ID, from_chat_id=message.chat_id,
-            message_id=message.message_id, caption=caption[:1024],
+            chat_id=OWNER_ID,
+            from_chat_id=message.chat_id,
+            message_id=message.message_id,
+            caption=caption[:1024],
+            protect_content=PROTECT_CONTENT,
         )
     else:
         return
@@ -198,11 +227,15 @@ async def handle_owner_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if recipient_id is None:
         return
     if message.text:
-        await context.bot.send_message(chat_id=recipient_id, text=message.text)
+        await context.bot.send_message(
+            chat_id=recipient_id, text=message.text, protect_content=PROTECT_CONTENT
+        )
     elif is_media_message(message):
         await context.bot.copy_message(
-            chat_id=recipient_id, from_chat_id=message.chat_id,
+            chat_id=recipient_id,
+            from_chat_id=message.chat_id,
             message_id=message.message_id,
+            protect_content=PROTECT_CONTENT,
         )
 
 
