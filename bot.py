@@ -104,19 +104,19 @@ def fallback_reply(text: str) -> str:
     if "شكرا" in lowered or "مشكور" in lowered:
         return "العفو  🥹"
     if "كيفك" in lowered or "شلونك" in lowered:
-        return "بخير  🔥"
-    return " 🧡 اكتب طلبك وبحاول أفيدك."
+        return "تمام 🔥"
+    return " 🧡 "
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
         context.user_data["ai_history"] = []
-        await update.message.reply_text("MY ZONE🧞‍♂️", reply_markup=main_keyboard())
+        await update.message.reply_text("      MY ZONE🧞‍♂️", reply_markup=main_keyboard())
 
 
 async def send_channel_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
-        await update.message.reply_text("MY ZONE🧞‍♂️", reply_markup=main_keyboard())
+        await update.message.reply_text("     MY ZONE🧞‍♂️", reply_markup=main_keyboard())
 
 
 async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
