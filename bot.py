@@ -88,7 +88,7 @@ def get_sender_label(user_id: int) -> str:
 
 def private_channel_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("☰ Menu", callback_data="menu")],
+        [InlineKeyboardButton("🎵 Play Music", callback_data="play_music")],
         [InlineKeyboardButton("Private Channel 🔥⚡️", url=PRIVATE_CHANNEL_URL)],
     ])
 
@@ -103,12 +103,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "🖤", reply_markup=private_channel_markup(), protect_content=PROTECT_CONTENT
     )
-
-
-async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_reply_markup(reply_markup=private_channel_markup())
 
 
 async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -174,6 +168,26 @@ async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
         return
     await update.message.reply_audio(audio=file_id, protect_content=PROTECT_CONTENT)
+
+
+async def play_music_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    if not MUSIC_FILE.exists():
+        await query.message.reply_text(
+            "No music has been set yet.", protect_content=PROTECT_CONTENT
+        )
+        return
+
+    file_id = MUSIC_FILE.read_text(encoding="utf-8").strip()
+    if not file_id:
+        await query.message.reply_text(
+            "No music has been set yet.", protect_content=PROTECT_CONTENT
+        )
+        return
+
+    await query.message.reply_audio(audio=file_id, protect_content=PROTECT_CONTENT)
 
 
 def is_media_message(message) -> bool:
@@ -255,7 +269,7 @@ app.add_handler(CommandHandler("menu", menu))
 app.add_handler(CommandHandler("setmusic", set_music))
 app.add_handler(CommandHandler("music", play_music))
 app.add_handler(CommandHandler("rename", rename_user))
-app.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu$"))
+app.add_handler(CallbackQueryHandler(play_music_callback, pattern="^play_music$"))
 app.add_handler(MessageHandler(filters.ALL, handle_incoming_message))
 
 print("Bot is running...")
