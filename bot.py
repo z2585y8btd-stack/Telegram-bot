@@ -26,10 +26,13 @@ MUSIC_FILE = Path(os.environ.get("MUSIC_FILE", "music_file_id.txt"))
 INBOX_FILE = Path(os.environ.get("ANONYMOUS_INBOX_FILE", "anonymous_inbox.json"))
 ALIASES_FILE = Path(os.environ.get("ANONYMOUS_ALIASES_FILE", "anonymous_aliases.json"))
 PRIVATE_CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
-CHANNEL_BUTTON_TEXT = "🔥 Join"
-# Keep accepting the previous long button text for users who still have it
-# cached in their Telegram keyboard.
-LEGACY_CHANNEL_BUTTON_TEXT = "🔥 JOIN THE PRIVATE CHANNEL 🔥"
+CHANNEL_BUTTON_TEXT = "🔐 دخول القناة | 30 يومًا"
+# Keep accepting the previous button texts for users who still have them cached
+# in their Telegram keyboard.
+LEGACY_CHANNEL_BUTTON_TEXTS = (
+    "🔥 Join",
+    "🔥 JOIN THE PRIVATE CHANNEL 🔥",
+)
 
 
 def load_inbox() -> dict[str, int]:
@@ -107,13 +110,13 @@ def private_channel_markup() -> ReplyKeyboardMarkup:
 
 def channel_link_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Private Channel ⭐️", url=PRIVATE_CHANNEL_URL)],
+        [InlineKeyboardButton("🔓 الدخول لمدة 30 يومًا", url=PRIVATE_CHANNEL_URL)],
     ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Hi 👻\nاضغط على زر 🔥 Join لفتح القناة الخاصة.",
+        "أهلًا بك 👋\nللدخول إلى القناة الخاصة، اشترك لمدة 30 يومًا ثم اضغط الزر بالأسفل.",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -121,7 +124,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "القائمة الرئيسية:",
+        "اختر الدخول إلى القناة الخاصة لمدة 30 يومًا:",
         reply_markup=private_channel_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -131,7 +134,7 @@ async def channel_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Telegram requires non-empty text for sendMessage. The old code sent only
     # a keyboard, so pressing the button could fail before showing the link.
     await update.message.reply_text(
-        "Private Channel",
+        "💎 اشتراكك يتيح لك الدخول إلى القناة لمدة 30 يومًا.\n\nاضغط الزر للمتابعة 👇",
         reply_markup=channel_link_markup(),
         protect_content=PROTECT_CONTENT,
     )
@@ -149,8 +152,7 @@ async def set_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         and not (audio.file_name or "").lower().endswith(".mp3")
     ):
         await message.reply_text(
-            "Reply to an MP3 audio file with /setmusic.",
-            protect_content=PROTECT_CONTENT,
+            "Reply to an MP3 audio file with /setmusic.", protect_content=PROTECT_CONTENT
         )
         return
     MUSIC_FILE.write_text(audio.file_id, encoding="utf-8")
@@ -304,7 +306,8 @@ app.add_handler(CommandHandler("rename", rename_user))
 app.add_handler(
     MessageHandler(
         filters.TEXT & filters.Regex(
-            rf"^(?:{re.escape(CHANNEL_BUTTON_TEXT)}|{re.escape(LEGACY_CHANNEL_BUTTON_TEXT)})$"
+            rf"^(?:{re.escape(CHANNEL_BUTTON_TEXT)}|"
+            rf"{'|'.join(re.escape(text) for text in LEGACY_CHANNEL_BUTTON_TEXTS)})$"
         ),
         channel_button,
     )
