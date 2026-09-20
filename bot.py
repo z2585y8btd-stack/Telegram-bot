@@ -29,8 +29,8 @@ CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
 SNAPCHAT_USERNAME = "Sela.mon"
-SNAPCHAT_PRICE = 100
-SNAPCHAT_PAYLOAD_PREFIX = "snapchat_100_stars"
+SNAPCHAT_PRICE = 250
+SNAPCHAT_PAYLOAD_PREFIX = "snapchat_250_stars"
 MAX_HISTORY_MESSAGES = 20
 OPENAI_QUOTA_ERROR_CODES = {"insufficient_quota", "credit_balance_exhausted"}
 
@@ -85,7 +85,7 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📣 انضم الآن إلى القناة", url=CHANNEL_URL)],
-        [InlineKeyboardButton("Snapchat 👻 — 100 ⭐️", callback_data=SNAPCHAT_CALLBACK)],
+        [InlineKeyboardButton("Snapchat 👻 — 250 ⭐️", callback_data=SNAPCHAT_CALLBACK)],
         [InlineKeyboardButton("✉️ إرسال رسالة لصاحب البوت", callback_data=CONTACT_ADMIN_CALLBACK)],
     ])
 
@@ -137,7 +137,7 @@ async def create_snapchat_invoice(update: Update, context: ContextTypes.DEFAULT_
     try:
         await query.message.reply_invoice(
             title="Snapchat 👻",
-            description="Snapchat account — 100 ⭐️",
+            description="Snapchat account — 250 ⭐️",
             payload=payload,
             currency="XTR",
             prices=[LabeledPrice("Snapchat 👻", SNAPCHAT_PRICE)],
@@ -180,7 +180,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         await message.get_bot().send_message(
             chat_id=ADMIN_ID,
-            text=f"💰 عملية شراء Snapchat\nالمستخدم: {message.from_user.id}\nالمبلغ: 100 نجمة\nCharge ID: {payment.telegram_payment_charge_id}",
+            text=f"💰 عملية شراء Snapchat\nالمستخدم: {message.from_user.id}\nالمبلغ: 250 نجمة\nCharge ID: {payment.telegram_payment_charge_id}",
         )
     except Exception:
         logger.exception("Could not notify admin")
@@ -291,7 +291,7 @@ async def forward_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def set_commands(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand("start", "بدء البوت"), BotCommand("channel", "رابط القناة"),
-        BotCommand("rename", "تغيير اسم ش��ص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
+        BotCommand("rename", "تغيير اسم شخص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
     ])
 
 
