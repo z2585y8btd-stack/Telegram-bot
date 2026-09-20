@@ -88,7 +88,6 @@ def get_sender_label(user_id: int) -> str:
 
 def private_channel_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎵 Play Music", callback_data="play_music")],
         [InlineKeyboardButton("Private Channel 🔥⚡️", url=PRIVATE_CHANNEL_URL)],
     ])
 
