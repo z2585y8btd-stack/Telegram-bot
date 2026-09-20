@@ -25,7 +25,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ADMIN_ID = int(os.getenv("BOT_ADMIN_ID", "8561249287"))
 USER_STORE_FILE = Path(os.getenv("USER_STORE_FILE", "bot_users.json"))
-CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
+CHANNEL_URL = "https://t.me/+j18rp8R3LYI2MTNk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
 SNAPCHAT_USERNAME = "Sela.mon"
@@ -291,7 +291,7 @@ async def forward_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def set_commands(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand("start", "بدء البوت"), BotCommand("channel", "رابط القناة"),
-        BotCommand("rename", "تغيير اسم شخص - للمالك فقط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
+        BotCommand("rename", "تغيير اسم شخص - للمالك ��قط"), BotCommand("people", "عرض الأشخاص - للمالك فقط"),
     ])
 
 
