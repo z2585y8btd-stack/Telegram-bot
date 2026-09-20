@@ -25,7 +25,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 ADMIN_ID = int(os.getenv("BOT_ADMIN_ID", "8561249287"))
 USER_STORE_FILE = Path(os.getenv("USER_STORE_FILE", "bot_users.json"))
-CHANNEL_URL = "https://t.me/+j18rp8R3LYI2MTNk"
+CHANNEL_URL = "https://t.me/+GAwxV_OfpMEyMmJk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
 SNAPCHAT_USERNAME = "Sela.mon"
@@ -219,7 +219,7 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
         await message.copy(chat_id=int(recipient_id))
         await message.reply_text("تم إرسال الرد ✅")
     except Exception:
-        await message.reply_text("ما قدرت أرسل الرد؛ يم��ن المستخدم حظر البوت.")
+        await message.reply_text("ما قدرت أرسل الرد؛ ��مكن المستخدم حظر البوت.")
     return True
 
 
