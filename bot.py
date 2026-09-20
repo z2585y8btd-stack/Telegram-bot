@@ -103,7 +103,7 @@ def private_channel_markup() -> ReplyKeyboardMarkup:
 
 def channel_link_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Klick here", url=PRIVATE_CHANNEL_URL)],
+        [InlineKeyboardButton("Private Channel ⭐️", url=PRIVATE_CHANNEL_URL)],
     ])
 
 
@@ -125,7 +125,6 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def channel_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "اضغط على الزر للانضمام إلى القناة:",
         reply_markup=channel_link_markup(),
         protect_content=PROTECT_CONTENT,
     )
