@@ -49,7 +49,7 @@ OPENAI_API_KEY = get_env("OPENAI_API_KEY")
 OPENAI_MODEL = get_env("OPENAI_MODEL", "OPENAI_MODEL") or "gpt-4o-mini"
 ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
-CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
+CHANNEL_URL = "https://t.me/+vBYnpSIv6RgyOTZk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
 SNAPCHAT_USERNAME = "Sela.mon"
@@ -256,7 +256,7 @@ async def rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     identifier, new_name = context.args[0], " ".join(context.args[1:]).strip()
     record = next((item for item in STORE["users"].values() if str(item.get("person_number")) == identifier or str(item.get("user_id")) == identifier), None)
     if not record:
-        await update.message.reply_text("ما لقيت ه��ا الشخص. استخدم /people لمعرفة الأرقام.")
+        await update.message.reply_text("ما لقيت هذا الشخص. استخدم /people لمعرفة الأرقام.")
         return
     record["name"] = new_name[:64]
     save_store()
