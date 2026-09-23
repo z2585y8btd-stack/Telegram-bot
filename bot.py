@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
+from dotenv import load_dotenv
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Update
 from telegram.constants import ChatAction
 from telegram.ext import (
@@ -17,14 +18,37 @@ try:
 except ImportError:  # pragma: no cover
     AsyncOpenAI = None
 
+load_dotenv()
+
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-ADMIN_ID = int(os.getenv("BOT_ADMIN_ID", "8561249287"))
-USER_STORE_FILE = Path(os.getenv("USER_STORE_FILE", "bot_users.json"))
+
+def get_env(name: str, *aliases: str) -> str:
+    for key in (name, *aliases):
+        value = os.getenv(key, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def get_env_int(name: str, *aliases: str, default: int) -> int:
+    for key in (name, *aliases):
+        value = os.getenv(key, "").strip()
+        if value:
+            try:
+                return int(value)
+            except ValueError:
+                logger.warning("Invalid integer value for %s=%r; using default %s", key, value, default)
+                break
+    return default
+
+
+BOT_TOKEN = get_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN", "TELEGRAM_TOKEN")
+OPENAI_API_KEY = get_env("OPENAI_API_KEY")
+OPENAI_MODEL = get_env("OPENAI_MODEL", "OPENAI_MODEL") or "gpt-4o-mini"
+ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
+USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 CHANNEL_URL = "https://t.me/+LIVzUK7_TxphNGZk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
@@ -35,7 +59,7 @@ MAX_HISTORY_MESSAGES = 20
 OPENAI_QUOTA_ERROR_CODES = {"insufficient_quota", "credit_balance_exhausted"}
 
 SYSTEM_PROMPT = """أنت مساعد تيليجرام سعودي ذكي ولطيف وخفيف دم.
-أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية، وكن مفيدًا ولطيفًا.
+أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية، وكن مفي��ًا ولطيفًا.
 إذا سأل المستخدم وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
 لا تستخدم محتوى جنسيًا صريحًا أو يستغل القاصرين أو يتضمن إكراهًا."""
 
@@ -232,7 +256,7 @@ async def rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     identifier, new_name = context.args[0], " ".join(context.args[1:]).strip()
     record = next((item for item in STORE["users"].values() if str(item.get("person_number")) == identifier or str(item.get("user_id")) == identifier), None)
     if not record:
-        await update.message.reply_text("ما لقيت هذا الشخص. استخدم /people لمعرفة الأرقام.")
+        await update.message.reply_text("ما لقيت ه��ا الشخص. استخدم /people لمعرفة الأرقام.")
         return
     record["name"] = new_name[:64]
     save_store()
@@ -297,7 +321,9 @@ async def set_commands(application: Application) -> None:
 
 def main() -> None:
     if not BOT_TOKEN:
-        raise RuntimeError("The TELEGRAM_BOT_TOKEN environment secret is not set")
+        raise RuntimeError(
+            "No Telegram bot token found. Put it in a .env file as TELEGRAM_BOT_TOKEN=... or set BOT_TOKEN in the environment."
+        )
     application = Application.builder().token(BOT_TOKEN).post_init(set_commands).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("channel", send_channel_link))
