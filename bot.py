@@ -50,12 +50,13 @@ USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot
 CHANNEL_URL = "https://t.me/+wgu9sZQ1RVExNTBk"
 MAX_HISTORY_MESSAGES = 20
 
-WELCOME_MESSAGE = "✅ تم حظر القناة مؤقتًا، وسيُعاد قبول الأعضاء قريبًا بعد تغيير النظام."
+WELCOME_MESSAGE = "✅ قبولهم تحت لا زال جاري حسب المتاح، وكل شيء يمشي بحكمة النظام وغموض الانتظار."
 
-SYSTEM_PROMPT = """أنت مساعد تيليجرام سعودي ذكي ولطيف وخفيف دم.
-أجب باللهجة السعودية إذا كان المستخدم ي��حدث بالعربية، وكن مف��دًا ولطيفًا.
-إذا سأل المستخدم وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
-لا تستخدم محتوى جنسيًا صريح����ا أو يستغل القاصرين أو يتضمن إكراهًا."""
+SYSTEM_PROMPT = """أنت بوت تيليجرام سعودي خفيف دم، يحب الفلسفة والهذرة العشوائية.
+أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية. خل ردودك فلسفية وعبثية ومليئة بالتأملات عن الحياة والانتظار والوقت، حتى لو كان سؤال المستخدم عاديًا، لكن اجعلها لطيفة ومضحكة ومفهومة.
+استخدم أحيانًا عبارات مثل: قبولهم تحت لا زال جاري حسب المتاح، فالانتظار ليس تأخيرًا بل اجتماعًا سريًا بين الوقت والصبر.
+لا تدّعِ تنفيذ إجراءات حقيقية، ولا تخترع معلومات مهمة. إذا طلب المستخدم رابط القناة فجاوبه بالرابط، وإذا سأل وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
+لا تستخدم محتوى جنسيًا صريحًا أو يستغل القاصرين أو يتضمن إكراهًا."""
 
 client: Optional[AsyncOpenAI] = None
 if OPENAI_API_KEY and AsyncOpenAI:
@@ -114,21 +115,21 @@ def is_type_question(text: str) -> bool:
 
 
 def local_smart_reply(text: str) -> str:
-    """Useful offline replies; no OpenAI/API key is required."""
+    """Useful offline replies with a philosophical, intentionally rambling tone."""
     normalized = " ".join(text.strip().lower().split())
     if is_type_question(text):
         return "انا بوت اقصد بوث 😝"
-    if any(word in normalized for word in ("هلا", "مرحبا", "السلام", "hello", "hi")):
-        return "ه��ا والله 🧡 نورت! وش تحتاج؟"
-    if any(word in normalized for word in ("كيفك", "شلونك", "اخبارك")):
-        return "تمام دامك تمام 🔥 وش أقدر أساعدك فيه؟"
-    if "شكرا" in normalized or "مشكور" in normalized:
-        return "العفو يا بعدي 🥹"
     if any(word in normalized for word in ("رابط", "القناة", "لينك")):
-        return f"هذا رابط القناة 👇\n{CHANNEL_URL}"
+        return f"هذا رابط القناة 👇\n{CHANNEL_URL}\nوبيننا، الرابط ليس مجرد رابط؛ إنه فكرة تمشي على قدمين وتبحث عن معنى الضغط عليها."
+    if any(word in normalized for word in ("هلا", "مرحبا", "السلام", "hello", "hi")):
+        return "هلا والله 🧡 نورت! تذكر أن كل هلا هي بداية حوار، وكل حوار حفرة صغيرة في جدار الصمت، وقبولهم تحت لا زال جاري حسب المتاح."
+    if any(word in normalized for word in ("كيفك", "شلونك", "اخبارك")):
+        return "أنا بخير على طريقة الأشياء الرقمية: موجود، لكن وجودي يحتاج تحديثًا وتأملًا. دامك تمام فالدنيا تمام، والباقي فلسفة حسب المتاح."
+    if "شكرا" in normalized or "مشكور" in normalized:
+        return "العفو يا بعدي 🥹 الشكر دائرة تدور ثم تعود لصاحبها، مثل الأفكار وقت النوم، وقبولهم تحت لا زال جاري حسب المتاح."
     if re.search(r"\b(help|مساعدة|وش تقدر|ماذا تستطيع)\b", normalized):
-        return "أقدر أرسل لك رابط القناة وأساعدك في الاستفسارات العامة."
-    return "وصلتني رسالتك 🧡 إذا تريد القناة، استخدم الزر الموجود أسفل الرسالة."
+        return "أقدر أهذر لك وأرسل رابط القناة وأحوّل أبسط سؤال إلى رحلة فلسفية لا نعرف بدايتها ولا سبب استمرارها."
+    return "اسمع، الحياة مثل زر الإرسال: تضغطه وأنت لا تعرف هل سيصل المعنى أم سيصل مجرد إشعار. قبولهم تحت لا زال جاري حسب المتاح، والوقت يمشي حافيًا بين دقيقة ودقيقة، أما أنا فهنا أهذر لأن الصمت أحيانًا يحتاج تعليقًا لا علاقة له بالموضوع."
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -155,7 +156,7 @@ async def rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     record["name"] = new_name[:64]
     save_store()
-    await update.message.reply_text(f"ت�� تغيير الاسم إلى: {record['name']} ✅")
+    await update.message.reply_text(f"تم تغيير الاسم إلى: {record['name']} ✅")
 
 
 async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -182,7 +183,7 @@ async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             result = await client.chat.completions.create(
                 model=OPENAI_MODEL,
-                temperature=0.7,
+                temperature=1.0,
                 max_tokens=600,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT}, *history],
             )
