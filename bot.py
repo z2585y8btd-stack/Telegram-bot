@@ -57,6 +57,15 @@ SNAPCHAT_PRICE = 100
 SNAPCHAT_PAYLOAD_PREFIX = "snapchat_100_stars"
 MAX_HISTORY_MESSAGES = 20
 
+WELCOME_MESSAGE = """📢 تنويه مهم
+
+تم حجب القناة بسبب قيود متعلقة بصورة البروفايل، ولذلك تم إن��اء قناة جديدة. جميع الأعضاء الذين كانوا في القناة السابقة سيتم قبولهم في القناة الجديدة دون أي رسوم أو تكاليف.
+
+✅ الدخول متاح حالياً للجميع بشكل مجاني.
+✅ سيتم قبول طلبات الانضمام على دفعات.
+✅ سيتم قريباً إضافة قناة استثنائية ومميزة داخل القناة.
+✅ بعد فترة سيتم تغيير نظام الدخول والقبول وفق التحديثات الجديدة."""
+
 SYSTEM_PROMPT = """أنت مساعد تيليجرام سعودي ذكي ولطيف وخفيف دم.
 أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية، وكن مفيدًا ولطيفًا.
 إذا سأل المستخدم وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
@@ -140,14 +149,14 @@ def local_smart_reply(text: str) -> str:
     if any(word in normalized for word in ("صاحب", "المالك", "الادمن", "الإدارة", "تواصل")):
         return "اضغط زر Send me a message واكتب رسالتك، وبوصلها لصاحب البوت 📩"
     if re.search(r"\b(help|مساعدة|وش تقدر|ماذا تستطيع)\b", normalized):
-        return "أقدر أرسل لك رابط القناة، أشرح لك شراء Snapchat، أو أوصل رسالتك لصاحب البوت."
+        return "أ��در أرسل لك رابط القناة، أشرح لك شراء Snapchat، أو أوصل رسالتك لصاحب البوت."
     return "وصلتني رسالتك 🧡 جرّب تسألني عن القناة أو Snapchat، أو اضغط Send me a message للتواصل مع صاحب البوت."
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
         context.user_data["ai_history"] = []
-        await update.message.reply_text("      MY ZONE🧞‍♂️", reply_markup=main_keyboard())
+        await update.message.reply_text(WELCOME_MESSAGE, reply_markup=main_keyboard())
 
 
 async def send_channel_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -231,7 +240,7 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
         return False
     try:
         await message.copy(chat_id=int(recipient_id))
-        await message.reply_text("تم إرسال الرد ✅")
+        await message.reply_text("تم إرسال ال��د ✅")
     except Exception:
         await message.reply_text("ما قدرت أرسل الرد؛ يمكن المستخدم حظر البوت.")
     return True
