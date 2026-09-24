@@ -49,7 +49,7 @@ OPENAI_API_KEY = get_env("OPENAI_API_KEY")  # Optional: the bot works without it
 OPENAI_MODEL = get_env("OPENAI_MODEL") or "gpt-4o-mini"
 ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
-CHANNEL_URL = "https://t.me/+vBYnpSIv6RgyOTZk"
+CHANNEL_URL = "https://t.me/+wgu9sZQ1RVExNTBk"
 CONTACT_ADMIN_CALLBACK = "contact_admin"
 SNAPCHAT_CALLBACK = "buy_snapchat"
 SNAPCHAT_USERNAME = "Sela.mon"
@@ -257,7 +257,7 @@ async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.from_user or update.message.from_user.id != ADMIN_ID:
         return
     records = sorted(STORE["users"].values(), key=lambda item: item["person_number"])
-    await update.message.reply_text("📋 الأشخاص:\n" + "\n".join(f"{display_name(x)} — ID: {x['user_id']}" for x in records) if records else "ما عندك متلقين مسجلين حاليًا.")
+    await update.message.reply_text("📋 الأشخاص:\n" + "\n".join(f"{display_name(x)} — ID: {x['user_id']}" for x in records) if records else "ما عندك متلقين مسجلين حتى الآن.")
 
 
 async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
