@@ -55,7 +55,7 @@ WELCOME_MESSAGE = "✅ تم حظر القناة مؤقتًا، وسيُعاد ق
 SYSTEM_PROMPT = """أنت مساعد تيليجرام سعودي ذكي ولطيف وخفيف دم.
 أجب باللهجة السعودية إذا كان المستخدم ي��حدث بالعربية، وكن مف��دًا ولطيفًا.
 إذا سأل المستخدم وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
-لا تستخدم محتوى جنسيًا صريح��ا أو يستغل القاصرين أو يتضمن إكراهًا."""
+لا تستخدم محتوى جنسيًا صريح����ا أو يستغل القاصرين أو يتضمن إكراهًا."""
 
 client: Optional[AsyncOpenAI] = None
 if OPENAI_API_KEY and AsyncOpenAI:
@@ -104,7 +104,7 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💀𝗣𝗥𝗜𝗩𝗔𝗧𝗘 𝗖𝗛𝗔𝗡𝗡𝗘𝗟💀", url=CHANNEL_URL)],
+        [InlineKeyboardButton("🎫", url=CHANNEL_URL)],
     ])
 
 
@@ -119,7 +119,7 @@ def local_smart_reply(text: str) -> str:
     if is_type_question(text):
         return "انا بوت اقصد بوث 😝"
     if any(word in normalized for word in ("هلا", "مرحبا", "السلام", "hello", "hi")):
-        return "هلا والله 🧡 نورت! وش تحتاج؟"
+        return "ه��ا والله 🧡 نورت! وش تحتاج؟"
     if any(word in normalized for word in ("كيفك", "شلونك", "اخبارك")):
         return "تمام دامك تمام 🔥 وش أقدر أساعدك فيه؟"
     if "شكرا" in normalized or "مشكور" in normalized:
