@@ -6,10 +6,13 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (
+    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Update,
+)
 from telegram.constants import ChatAction
 from telegram.ext import (
-    Application, CommandHandler, ContextTypes, MessageHandler, filters,
+    Application, CallbackQueryHandler, CommandHandler, ContextTypes,
+    MessageHandler, PreCheckoutQueryHandler, filters,
 )
 
 try:
@@ -48,6 +51,8 @@ OPENAI_MODEL = get_env("OPENAI_MODEL") or "gpt-4o-mini"
 ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 CHANNEL_URL = "https://t.me/+wgu9sZQ1RVExNTBk"
+PRIVATE_CHANNEL_URL = "https://t.me/+6VVYBI0I5LwxMGY0"
+PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 MAX_HISTORY_MESSAGES = 20
 
 WELCOME_MESSAGE = "✅ قبولهم تحت لا زال جاري حسب المتاح، وكل شيء يمشي بحكمة النظام وغموض الانتظار."
@@ -105,7 +110,10 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎫", url=CHANNEL_URL)],
+        [
+            InlineKeyboardButton("🎫", url=CHANNEL_URL),
+            InlineKeyboardButton("Private Channel ®️", callback_data="subscribe_private"),
+        ],
     ])
 
 
@@ -167,6 +175,53 @@ async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(text)
 
 
+async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_invoice(
+        chat_id=chat_id,
+        title="اشتراك القناة الخاصة",
+        description="اشترك الآن في القناة الخاصة عبر Telegram Stars.",
+        payload="private_channel_subscription",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice("Private Channel Subscription", PRIVATE_CHANNEL_STARS_AMOUNT)],
+    )
+
+
+async def handle_private_channel_subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+    chat_id = query.message.chat_id if query.message else query.from_user.id
+    await send_private_channel_invoice(chat_id, context)
+
+
+async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    await send_private_channel_invoice(update.message.chat_id, context)
+
+
+async def handle_pre_checkout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.pre_checkout_query
+    if not query:
+        return
+    await query.answer(ok=True)
+
+
+async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.message
+    if not message or not message.successful_payment:
+        return
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Join", url=PRIVATE_CHANNEL_URL)],
+    ])
+    await message.reply_text(
+        "✅ تم الدفع بنجاح! اضغط على الزر بالأسفل للانضمام للقناة الخاصة.",
+        reply_markup=keyboard,
+    )
+
+
 async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
     if not message or not message.text or not message.from_user:
@@ -199,6 +254,7 @@ async def set_commands(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand("start", "بدء البوت"),
         BotCommand("channel", "رابط القناة"),
+        BotCommand("subscribe", "اشترك في القناة الخاصة عبر Telegram Stars"),
         BotCommand("rename", "تغيير اسم شخص - للمالك فقط"),
         BotCommand("people", "عرض الأشخاص - للمالك فقط"),
     ])
@@ -210,8 +266,12 @@ def main() -> None:
     application = Application.builder().token(BOT_TOKEN).post_init(set_commands).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("channel", send_channel_link))
+    application.add_handler(CommandHandler("subscribe", subscribe_command))
     application.add_handler(CommandHandler("rename", rename))
     application.add_handler(CommandHandler("people", people))
+    application.add_handler(CallbackQueryHandler(handle_private_channel_subscribe, pattern="^subscribe_private$"))
+    application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, respond))
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
