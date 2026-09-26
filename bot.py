@@ -177,8 +177,8 @@ async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_invoice(
         chat_id=chat_id,
-        title="اشتراك القناة الخاصة",
-        description="اشترك الآن في القناة الخاصة عبر Telegram Stars.",
+        title="Subscribe",
+        description="Subscribe",
         payload="private_channel_subscription",
         provider_token="",
         currency="XTR",
