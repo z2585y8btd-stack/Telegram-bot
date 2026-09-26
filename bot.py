@@ -216,7 +216,7 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("Join", url=PRIVATE_CHANNEL_URL)],
     ])
     await message.reply_text(
-        "✅ تم الدفع بنجاح! اضغط على الزر بالأسفل للانضمام للقناة الخاصة.",
+        "المستخدم يحصل على رابط القناة بعد اتمام الدفع",
         reply_markup=keyboard,
     )
 
