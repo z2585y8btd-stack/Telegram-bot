@@ -111,7 +111,6 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
 def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🎫", url=CHANNEL_URL),
             InlineKeyboardButton("Private Channel ®️", callback_data="subscribe_private"),
         ],
     ])
