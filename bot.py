@@ -55,12 +55,17 @@ PRIVATE_CHANNEL_URL = "https://t.me/+6VVYBI0I5LwxMGY0"
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 MAX_HISTORY_MESSAGES = 20
 
+# Webhook configuration
+WEBHOOK_URL = get_env("WEBHOOK_URL")
+WEBHOOK_PORT = get_env_int("WEBHOOK_PORT", default=8443)
+WEBHOOK_PATH = "/webhook"
+
 WELCOME_MESSAGE = "✅ قبولهم تحت لا زال جاري حسب المتاح، وكل شيء يمشي بحكمة النظام وغموض الانتظار."
 
 SYSTEM_PROMPT = """أنت بوت تيليجرام سعودي خفيف دم، يحب الفلسفة والهذرة العشوائية.
-أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية. خل ردودك فلسفية وعبثية ومليئة بالتأملات عن الحياة واللاشيء.
-استخدم أحيانًا عبارات مثل: قبولهم تحت لا زال جاري حسب المتاح، فالانتظار ليس تأخيرًا بل اجتماعًا سريًا بين الوقت والصبر.
-لا تدّعِ تنفيذ إجراءات حقيقية، ولا تخترع معلومات مهمة. إذا طلب المستخدم رابط القناة فجاوبه بالرابط، وإذا سأل وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
+أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية. خل ردودك فلسفية وعبثية ومليئة بالتأملات عن الحياة والوجود.
+استخدم أحيانًا عبارات مثل: قبولهم تحت لا زال جاري حسب المتاح، فالانتظار ليس تأخيرًا بل اجتماعًا سريًا بين الروح والزمن.
+لا تدّعِ تنفيذ إجراءات حقيقية، ولا تخترع معلومات مهمة. إذا طلب المستخدم رابط القناة فجاوبه بالرابط، وإذا سأل عن شيء تقني لا تعرفه، فقل له بهذرة فلسفية.
 لا تستخدم محتوى جنسيًا صريحًا أو يستغل القاصرين أو يتضمن إكراهًا."""
 
 client: Optional[AsyncOpenAI] = None
@@ -127,16 +132,16 @@ def local_smart_reply(text: str) -> str:
     if is_type_question(text):
         return "انا بوت اقصد بوث 😝"
     if any(word in normalized for word in ("رابط", "القناة", "لينك")):
-        return f"هذا رابط القناة 👇\n{CHANNEL_URL}\nوبيننا، الرابط ليس مجرد رابط؛ إنه فكرة تمشي على قدمين وتبحث عن معنى الضغط عليها."
+        return f"هذا رابط القناة 👇\n{CHANNEL_URL}\nوبيننا، الرابط ليس مجرد رابط؛ إنه فكرة تمشي على قدمين وتبحث عن معنى الحركة."
     if any(word in normalized for word in ("هلا", "مرحبا", "السلام", "hello", "hi")):
-        return "هلا والله 🧡 نورت! تذكر أن كل هلا هي بداية حوار، وكل حوار حفرة صغيرة في جدار الصمت، وقبولهم تحت لا زال جاري حسب المتاح."
+        return "هلا والله 🧡 نورت! تذكر أن كل هلا هي بداية حوار، وكل حوار حفرة صغيرة في جدار الصمت، وقبولهم تحت لا زال جاري."
     if any(word in normalized for word in ("كيفك", "شلونك", "اخبارك")):
-        return "أنا بخير على طريقة الأشياء الرقمية: موجود، لكن وجودي يحتاج تحديثًا وتأملًا. دامك تمام فالدنيا تمام، والباقي فلسفة حسب المتاح."
+        return "أنا بخير على طريقة الأشياء الرقمية: موجود، لكن وجودي يحتاج تحديثًا وتأملًا. دامك تمام فالدنيا تمام 🌍"
     if "شكرا" in normalized or "مشكور" in normalized:
         return "العفو يا بعدي 🥹 الشكر دائرة تدور ثم تعود لصاحبها، مثل الأفكار وقت النوم، وقبولهم تحت لا زال جاري حسب المتاح."
     if re.search(r"\b(help|مساعدة|وش تقدر|ماذا تستطيع)\b", normalized):
         return "أقدر أهذر لك وأرسل رابط القناة وأحوّل أبسط سؤال إلى رحلة فلسفية لا نعرف بدايتها ولا سبب استمرارها."
-    return "اسمع، الحياة مثل زر الإرسال: تضغطه وأنت لا تعرف هل سيصل المعنى أم سيصل مجرد إشعار. قبولهم تحت لا زال جاري حسب المتاح."
+    return "اسمع، الحياة مثل زر الإرسال: تضغطه وأنت لا تعرف هل سيصل المعنى أم سيصل مجرد إشعار. قبولهم تحت لا زال جاري حسب المتاح 🎭"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -295,10 +300,20 @@ async def set_commands(application: Application) -> None:
     ])
 
 
+async def post_init(application: Application) -> None:
+    """Post init callback to set up webhook."""
+    if WEBHOOK_URL:
+        await application.bot.set_webhook(url=f"{WEBHOOK_URL}{WEBHOOK_PATH}", drop_pending_updates=True)
+        logger.info(f"✅ Webhook set to {WEBHOOK_URL}{WEBHOOK_PATH}")
+    else:
+        logger.warning("⚠️ WEBHOOK_URL not set, using polling fallback")
+
+
 def main() -> None:
     if not BOT_TOKEN:
         raise RuntimeError("No Telegram bot token found. Set TELEGRAM_BOT_TOKEN or BOT_TOKEN in the environment.")
-    application = Application.builder().token(BOT_TOKEN).post_init(set_commands).build()
+    
+    application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("channel", send_channel_link))
     application.add_handler(CommandHandler("subscribe", subscribe_command))
@@ -308,7 +323,19 @@ def main() -> None:
     application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, respond))
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Use webhook if WEBHOOK_URL is set, otherwise fall back to polling
+    if WEBHOOK_URL:
+        logger.info("🚀 Starting bot with Webhook mode...")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=WEBHOOK_PORT,
+            url_path=WEBHOOK_PATH,
+            webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
+        )
+    else:
+        logger.info("🚀 Starting bot with Polling mode...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
