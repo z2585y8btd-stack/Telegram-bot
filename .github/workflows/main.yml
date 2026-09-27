@@ -6,6 +6,8 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -16,6 +18,8 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      - if: ${{ env.TELEGRAM_BOT_TOKEN == '' }}
+        run: echo "Skipping bot launch because TELEGRAM_BOT_TOKEN is not configured."
+
+      - if: ${{ env.TELEGRAM_BOT_TOKEN != '' }}
         run: python bot.py
