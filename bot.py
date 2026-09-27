@@ -538,13 +538,13 @@ def main() -> None:
     application.add_handler(CommandHandler("channelinfo", channelinfo))
     application.add_handler(
         MessageHandler(
-            filters.UpdateType.CHANNEL_POSTS & filters.TEXT & filters.Regex(r"(?i)^\s*/setchannel(@\w+)?\b"),
+            filters.UpdateType.CHANNEL_POSTS & filters.TEXT & filters.Regex(r"(?i)^\s*/setchannel(@\w+)?\s*$"),
             setchannel,
         )
     )
     application.add_handler(
         MessageHandler(
-            filters.UpdateType.CHANNEL_POSTS & filters.TEXT & filters.Regex(r"(?i)^\s*/channelinfo(@\w+)?\b"),
+            filters.UpdateType.CHANNEL_POSTS & filters.TEXT & filters.Regex(r"(?i)^\s*/channelinfo(@\w+)?\s*$"),
             channelinfo,
         )
     )
