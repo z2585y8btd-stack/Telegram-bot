@@ -500,7 +500,8 @@ def log_registered_handlers(application: Application) -> None:
                 else:
                     logger.info("  - MessageHandler: %s", handler.filters)
             elif isinstance(handler, ChatMemberHandler):
-                logger.info("  - ChatMemberHandler: my_chat_member")
+                chat_member_type = "my_chat_member" if handler.chat_member_types == ChatMemberHandler.MY_CHAT_MEMBER else "chat_member"
+                logger.info("  - ChatMemberHandler: %s", chat_member_type)
             elif isinstance(handler, TypeHandler):
                 type_name = getattr(handler.type, "__name__", str(handler.type))
                 logger.info("  - TypeHandler: %s", type_name)
