@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -53,6 +54,7 @@ USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot
 CHANNEL_URL = "https://t.me/+wgu9sZQ1RVExNTBk"
 PRIVATE_CHANNEL_URL = "https://t.me/+6VVYBI0I5LwxMGY0"
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
+TELEGRAM_PAYMENT_PROVIDER_TOKEN = get_env("TELEGRAM_PAYMENT_PROVIDER_TOKEN")
 MAX_HISTORY_MESSAGES = 20
 
 WELCOME_MESSAGE = "✅ قبولهم تحت لا زال جاري حسب المتاح، وكل شيء يمشي بحكمة النظام وغموض الانتظار."
@@ -69,7 +71,7 @@ if OPENAI_API_KEY and AsyncOpenAI:
 
 
 def load_store() -> dict[str, Any]:
-    default = {"next_person": 1, "users": {}, "admin_messages": {}, "payments": []}
+    default = {"next_person": 1, "users": {}, "admin_messages": {}, "payments": [], "subscriptions": {}}
     try:
         if USER_STORE_FILE.exists():
             default.update(json.loads(USER_STORE_FILE.read_text(encoding="utf-8")))
@@ -78,6 +80,7 @@ def load_store() -> dict[str, Any]:
     default.setdefault("users", {})
     default.setdefault("admin_messages", {})
     default.setdefault("payments", [])
+    default.setdefault("subscriptions", {})
     return default
 
 
@@ -175,12 +178,20 @@ async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not TELEGRAM_PAYMENT_PROVIDER_TOKEN:
+        logger.error("Missing TELEGRAM_PAYMENT_PROVIDER_TOKEN; cannot create invoice")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="⚠️ خدمة الدفع غير مفعّلة حالياً. تواصل مع الإدارة لتفعيل الاشتراك.",
+        )
+        return
+    # Payment flow: create invoice -> pre-checkout -> successful payment -> store tracking -> send join link.
     await context.bot.send_invoice(
         chat_id=chat_id,
-        title="Subscribe",
-        description="",
+        title="اشتراك القناة الخاصة",
+        description="ادفع عبر Telegram Stars للحصول على رابط الانضمام للقناة الخاصة.",
         payload="private_channel_subscription",
-        provider_token="",
+        provider_token=TELEGRAM_PAYMENT_PROVIDER_TOKEN,
         currency="XTR",
         prices=[LabeledPrice("Private Channel Subscription", PRIVATE_CHANNEL_STARS_AMOUNT)],
     )
@@ -208,15 +219,50 @@ async def handle_pre_checkout_query(update: Update, context: ContextTypes.DEFAUL
     await query.answer(ok=True)
 
 
+def track_payment(message: Any, payment: Any) -> None:
+    """Persist full payment details and latest subscription info for a user."""
+    user = message.from_user
+    user_id = user.id if user else 0
+    user_key = str(user_id)
+    paid_at = datetime.now(timezone.utc).isoformat()
+    payment_record = {
+        "user_id": user_id,
+        "username": user.username if user else "",
+        "first_name": user.first_name if user else "",
+        "chat_id": message.chat_id,
+        "invoice_payload": payment.invoice_payload,
+        "telegram_payment_charge_id": payment.telegram_payment_charge_id,
+        "provider_payment_charge_id": payment.provider_payment_charge_id,
+        "currency": payment.currency,
+        "total_amount": payment.total_amount,
+        "paid_at": paid_at,
+    }
+    STORE["payments"].append(payment_record)
+    STORE["subscriptions"][user_key] = {
+        "status": "active",
+        "paid_at": paid_at,
+        "currency": payment.currency,
+        "total_amount": payment.total_amount,
+        "telegram_payment_charge_id": payment.telegram_payment_charge_id,
+        "invoice_payload": payment.invoice_payload,
+    }
+    save_store()
+
+
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
     if not message or not message.successful_payment:
         return
+    track_payment(message, message.successful_payment)
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Join", url=PRIVATE_CHANNEL_URL)],
     ])
     await message.reply_text(
-        "رابط القناة",
+        (
+            "✅ تم تأكيد الدفع بنجاح!\n"
+            f"المبلغ: {message.successful_payment.total_amount} {message.successful_payment.currency}\n"
+            "اضغط زر Join للدخول إلى القناة الخاصة."
+        ),
         reply_markup=keyboard,
     )
 
@@ -228,6 +274,9 @@ async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await message.chat.send_action(ChatAction.TYPING)
     if any(word in message.text.lower() for word in ("رابط القناة", "لينك القناة", "رابط قناة", "channel link")):
         await send_channel_link(update, context)
+        return
+    if any(word in message.text.lower() for word in ("دفع", "ادفع", "اشتراك", "stars", "xtr", "private channel")):
+        await message.reply_text("للاشتراك بالقناة الخاصة استخدم زر Private Channel ®️ أو الأمر /subscribe.")
         return
     reply = local_smart_reply(message.text)
     if client:
