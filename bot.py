@@ -40,12 +40,6 @@ BOT_TOKEN = get_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN", "TELEGRAM_TOKEN")
 ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 
-# Optional: if the bot is an admin in more than one channel, this bot setting
-# picks which one to use. Not required — if left empty and the bot is only
-# an admin (with invite-link permissions) in a single channel, that channel
-# is auto-detected and used at runtime.
-TARGET_CHANNEL = get_env("TARGET_CHANNEL", "TARGET_CHANNEL_ID", "PRIVATE_CHANNEL_ID")
-
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 
 # Webhook configuration
@@ -62,7 +56,7 @@ def load_store() -> dict[str, Any]:
         "users": {},
         "payments": [],
         "invite_links": {},
-        "admin_channels": {},
+        "target_channel": None,
     }
     try:
         if USER_STORE_FILE.exists():
@@ -72,7 +66,7 @@ def load_store() -> dict[str, Any]:
     default.setdefault("users", {})
     default.setdefault("payments", [])
     default.setdefault("invite_links", {})
-    default.setdefault("admin_channels", {})
+    default.setdefault("target_channel", None)
     return default
 
 
@@ -99,80 +93,72 @@ def user_record(user_id: int, user: Any) -> dict[str, Any]:
     return record
 
 
-def _remember_admin_channel(chat: Chat, can_invite_users: bool) -> None:
-    key = str(chat.id)
-    if can_invite_users:
-        STORE["admin_channels"][key] = {
-            "id": chat.id,
-            "title": chat.title or "",
-            "username": chat.username or "",
-        }
-    else:
-        STORE["admin_channels"].pop(key, None)
-    save_store()
-
-
-def _forget_admin_channel(chat: Chat) -> None:
-    STORE["admin_channels"].pop(str(chat.id), None)
-    save_store()
-
-
 async def get_target_channel_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[int]:
-    """Automatically determine the channel to use.
-
-    Resolution order:
-    1. If TARGET_CHANNEL is set (an explicit bot setting), use it — this lets
-       the operator pick a channel when the bot administers more than one.
-    2. If exactly one channel has been detected where the bot is an admin with
-       invite-link permissions, use that channel automatically.
-    3. Otherwise, the channel cannot be determined automatically.
-    """
-    if TARGET_CHANNEL:
-        value = TARGET_CHANNEL
-        try:
-            return int(value)
-        except ValueError:
-            try:
-                chat = await context.bot.get_chat(value)
-                return chat.id
-            except Exception:
-                logger.exception(f"Configured TARGET_CHANNEL {value!r} could not be resolved")
-                return None
-
-    channels = STORE.get("admin_channels", {})
-    if len(channels) == 1:
-        return next(iter(channels.values()))["id"]
-    if len(channels) > 1:
-        logger.error(
-            "Bot is admin with invite permissions in multiple channels %s; "
-            "set TARGET_CHANNEL to pick one.",
-            list(channels.keys()),
-        )
+    """Get the saved target channel ID for payment invites."""
+    channel_info = STORE.get("target_channel")
+    if not channel_info:
         return None
-    return None
+    return channel_info.get("id")
 
 
-async def handle_my_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Track channels where the bot is added/promoted/removed as admin.
-
-    This lets the bot automatically detect the channel it should manage,
-    without any manual chat-id configuration.
+async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set the current channel as the target payment channel (admin-only).
+    
+    Usage: Send /setchannel inside the channel where the bot is an admin.
     """
-    my_update = update.my_chat_member
-    if not my_update or my_update.chat.type not in (Chat.CHANNEL,):
+    if not update.message:
         return
-
-    new_member = my_update.new_chat_member
-    status = new_member.status
-    if status == "administrator":
-        can_invite = bool(getattr(new_member, "can_invite_users", False))
-        _remember_admin_channel(my_update.chat, can_invite)
-        if can_invite:
-            logger.info(f"Detected channel '{my_update.chat.title}' ({my_update.chat.id}) as admin with invite permissions")
-        else:
-            logger.warning(f"Bot is admin in '{my_update.chat.title}' ({my_update.chat.id}) but lacks invite-link permission")
-    else:
-        _forget_admin_channel(my_update.chat)
+    
+    # Only the bot owner can use this command
+    if update.message.from_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Only the bot owner can use this command.")
+        return
+    
+    # Command must be used in a channel (group or supergroup)
+    chat = update.message.chat
+    if chat.type not in (Chat.CHANNEL, Chat.SUPERGROUP, Chat.GROUP):
+        await update.message.reply_text("❌ This command must be used inside a channel or group.")
+        return
+    
+    # Verify the bot is an admin in this chat
+    try:
+        bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+        if bot_member.status != "administrator":
+            await update.message.reply_text("❌ The bot must be an administrator in this channel.")
+            return
+        
+        # Check if bot has permission to manage invite links
+        can_invite = getattr(bot_member, "can_invite_users", False)
+        if not can_invite:
+            await update.message.reply_text(
+                "❌ The bot must have permission to manage invite links in this channel."
+            )
+            return
+    except Exception as e:
+        logger.exception(f"Failed to verify bot admin status in {chat.id}")
+        await update.message.reply_text(f"❌ Error verifying bot permissions: {e}")
+        return
+    
+    # Save this channel as the target
+    STORE["target_channel"] = {
+        "id": chat.id,
+        "title": chat.title or chat.name or f"Channel {chat.id}",
+        "username": chat.username or "",
+    }
+    save_store()
+    
+    # Confirm to the owner
+    channel_info = STORE["target_channel"]
+    title = channel_info["title"]
+    channel_id = channel_info["id"]
+    username = channel_info.get("username", "")
+    
+    confirmation = f"✅ Channel set as target for payments!\n\nTitle: {title}\nChat ID: {channel_id}"
+    if username:
+        confirmation += f"\nUsername: @{username}"
+    
+    await update.message.reply_text(confirmation)
+    logger.info(f"Target channel set by admin: {title} ({channel_id})")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -257,7 +243,7 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
 
     channel_id = await get_target_channel_id(context)
     if not channel_id:
-        logger.error("Could not automatically determine the target channel; payment flow stopped")
+        logger.error("No target channel configured; payment flow stopped")
         await message.reply_text(
             "Payment received, but the invite link could not be created. Please contact support."
         )
@@ -266,9 +252,8 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
                 await context.bot.send_message(
                     chat_id=ADMIN_ID,
                     text=(
-                        "⚠️ Could not determine the target channel automatically.\n"
-                        "Make sure the bot is an administrator with invite-link "
-                        "permissions in exactly one channel, or set TARGET_CHANNEL.\n"
+                        "⚠️ No target payment channel has been configured.\n"
+                        "Use /setchannel in the channel where the bot should send invite links.\n"
                         f"Payment from user {user_id} was received but no invite link was issued."
                     ),
                 )
@@ -337,9 +322,9 @@ def main() -> None:
 
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("setchannel", setchannel))
     application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
-    application.add_handler(ChatMemberHandler(handle_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ignore_text))
 
