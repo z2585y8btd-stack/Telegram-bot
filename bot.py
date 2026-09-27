@@ -180,7 +180,7 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
         await context.bot.send_invoice(
             chat_id=chat_id,
             title="Subscribe",
-            description="",
+            description="اشتراك القناة الخاصة عبر Telegram Stars",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
