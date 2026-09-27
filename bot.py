@@ -536,10 +536,10 @@ def main() -> None:
     application.add_handler(CommandHandler("setchannel", setchannel))
     application.add_handler(CommandHandler("channelinfo", channelinfo))
     application.add_handler(
-        MessageHandler(filters.UpdateType.CHANNEL_POSTS & filters.Regex(r"(?i)^/setchannel(@\w+)?\b"), setchannel)
+        MessageHandler(filters.UpdateType.CHANNEL_POSTS & filters.Regex(r"(?i)^\s*/setchannel(@\w+)?\b"), setchannel)
     )
     application.add_handler(
-        MessageHandler(filters.UpdateType.CHANNEL_POSTS & filters.Regex(r"(?i)^/channelinfo(@\w+)?\b"), channelinfo)
+        MessageHandler(filters.UpdateType.CHANNEL_POSTS & filters.Regex(r"(?i)^\s*/channelinfo(@\w+)?\b"), channelinfo)
     )
     application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
