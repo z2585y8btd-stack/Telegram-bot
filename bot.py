@@ -42,6 +42,10 @@ try:
     ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW else None
 except ValueError:
     ADMIN_ID = None
+ADMIN_ID_CONFIG_ERROR_TEXT = (
+    "❌ Bot owner is not configured correctly.\n"
+    "Set BOT_ADMIN_ID (or ADMIN_ID) to your numeric Telegram user ID."
+)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
@@ -111,6 +115,16 @@ async def get_target_channel_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[
     return channel_info.get("id")
 
 
+def log_admin_id_config_error(command: str, user_id: Optional[int]) -> None:
+    logger.error(
+        "[/%s] Invalid or missing ADMIN_ID configuration. "
+        "received_user_id=%s configured_ADMIN_ID=%r",
+        command,
+        user_id,
+        ADMIN_ID_RAW,
+    )
+
+
 async def log_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log every incoming update for diagnostics."""
     update_id = update.update_id
@@ -164,16 +178,8 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     logger.info(f"[/setchannel] Received from user {user_id} in chat {effective_message.chat.id}")
 
     if ADMIN_ID is None:
-        logger.error(
-            "[/setchannel] Invalid or missing ADMIN_ID configuration. "
-            "received_user_id=%s configured_ADMIN_ID=%r",
-            user_id,
-            ADMIN_ID_RAW,
-        )
-        await effective_message.reply_text(
-            "❌ Bot owner is not configured correctly.\n"
-            "Set BOT_ADMIN_ID (or ADMIN_ID) to your numeric Telegram user ID."
-        )
+        log_admin_id_config_error("setchannel", user_id)
+        await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
         return
     
     # Only the bot owner can use this command
@@ -277,16 +283,8 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     logger.info(f"[/channelinfo] Received from user {user_id}")
 
     if ADMIN_ID is None:
-        logger.error(
-            "[/channelinfo] Invalid or missing ADMIN_ID configuration. "
-            "received_user_id=%s configured_ADMIN_ID=%r",
-            user_id,
-            ADMIN_ID_RAW,
-        )
-        await effective_message.reply_text(
-            "❌ Bot owner is not configured correctly.\n"
-            "Set BOT_ADMIN_ID (or ADMIN_ID) to your numeric Telegram user ID."
-        )
+        log_admin_id_config_error("channelinfo", user_id)
+        await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
         return
     
     # Only the bot owner can use this command
