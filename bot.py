@@ -288,7 +288,6 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
             chat_id=PRIVATE_CHANNEL_CHAT_ID,
             expire_date=datetime.now(timezone.utc) + timedelta(hours=1),
             creates_join_request=True,
-            member_limit=1,
             name=f"paid-user-{user_id}",
         )
         return invite.invite_link

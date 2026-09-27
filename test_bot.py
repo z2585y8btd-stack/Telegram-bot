@@ -59,6 +59,32 @@ class PaymentFlowTests(unittest.IsolatedAsyncioTestCase):
             bot.TELEGRAM_PAYMENT_PROVIDER_TOKEN = original_token
             bot.PRIVATE_CHANNEL_CHAT_ID = original_chat_id
 
+    async def test_track_payment_writes_payment_and_subscription(self) -> None:
+        original_payments = list(bot.STORE.get("payments", []))
+        original_subscriptions = dict(bot.STORE.get("subscriptions", {}))
+        try:
+            bot.STORE["payments"] = []
+            bot.STORE["subscriptions"] = {}
+            message = SimpleNamespace(
+                chat_id=456,
+                from_user=SimpleNamespace(id=456, username="paid_user", first_name="Paid"),
+            )
+            payment = SimpleNamespace(
+                invoice_payload="private_channel_subscription",
+                telegram_payment_charge_id="tg_charge_1",
+                provider_payment_charge_id="provider_charge_1",
+                currency="XTR",
+                total_amount=1800,
+            )
+            await bot.track_payment(message, payment)
+            self.assertEqual(len(bot.STORE["payments"]), 1)
+            self.assertEqual(bot.STORE["payments"][0]["telegram_payment_charge_id"], "tg_charge_1")
+            self.assertEqual(bot.STORE["subscriptions"]["456"]["status"], "active")
+            self.assertEqual(bot.STORE["subscriptions"]["456"]["provider_payment_charge_id"], "provider_charge_1")
+        finally:
+            bot.STORE["payments"] = original_payments
+            bot.STORE["subscriptions"] = original_subscriptions
+
     def test_format_xtr_amount(self) -> None:
         self.assertEqual(bot.format_payment_amount(1800, "XTR"), "1800 Stars")
         self.assertEqual(bot.format_payment_amount(0, "XTR"), "0 Stars")
