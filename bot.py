@@ -186,6 +186,13 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
             text="⚠️ خدمة الدفع غير مفعّلة حالياً. تواصل مع الإدارة لتفعيل الاشتراك.",
         )
         return
+    if not PRIVATE_CHANNEL_CHAT_ID:
+        logger.error("Missing PRIVATE_CHANNEL_CHAT_ID; secure invite links are not configured")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="⚠️ الاشتراك غير متاح الآن. تواصل مع الإدارة لإكمال إعدادات القناة الخاصة.",
+        )
+        return
     # Payment flow: create invoice -> pre-checkout -> successful payment -> store tracking -> send join link.
     await context.bot.send_invoice(
         chat_id=chat_id,
@@ -253,7 +260,7 @@ def track_payment(message: Any, payment: Any) -> None:
 
 async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> str:
     if not PRIVATE_CHANNEL_CHAT_ID:
-        return PRIVATE_CHANNEL_URL
+        return ""
     try:
         invite = await context.bot.create_chat_invite_link(
             chat_id=PRIVATE_CHANNEL_CHAT_ID,
@@ -263,8 +270,8 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
         )
         return invite.invite_link
     except Exception:
-        logger.exception("Could not create single-use invite link; falling back to default URL")
-        return PRIVATE_CHANNEL_URL
+        logger.exception("Could not create single-use invite link")
+        return ""
 
 
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -273,6 +280,13 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
         return
     track_payment(message, message.successful_payment)
     join_url = await generate_private_channel_join_url(context, message.from_user.id if message.from_user else 0)
+    if not join_url:
+        await message.reply_text(
+            "✅ تم تأكيد الدفع بنجاح، لكن تعذر إنشاء رابط الانضمام الآمن الآن.\n"
+            "تواصل مع الإدارة وأرسل رقم العملية:\n"
+            f"{message.successful_payment.telegram_payment_charge_id}"
+        )
+        return
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Join", url=join_url)],
     ])
