@@ -279,7 +279,7 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
 
 def format_payment_amount(total_amount: int, currency: str) -> str:
     if currency == "XTR":
-        return f"{total_amount / 100:.2f} Stars"
+        return f"{total_amount} Stars"
     return f"{total_amount} {currency}"
 
 

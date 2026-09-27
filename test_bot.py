@@ -58,7 +58,8 @@ class PaymentFlowTests(unittest.IsolatedAsyncioTestCase):
             bot.PRIVATE_CHANNEL_CHAT_ID = original_chat_id
 
     def test_format_xtr_amount(self) -> None:
-        self.assertEqual(bot.format_payment_amount(1800, "XTR"), "18.00 Stars")
+        self.assertEqual(bot.format_payment_amount(1800, "XTR"), "1800 Stars")
+        self.assertEqual(bot.format_payment_amount(250, "USD"), "250 USD")
 
 
 if __name__ == "__main__":
