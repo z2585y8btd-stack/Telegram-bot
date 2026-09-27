@@ -125,6 +125,13 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         logger.warning("[/setchannel] No message object")
         return
 
+    message_text = (message.text or "").strip()
+    message_parts = message_text.split(maxsplit=1)
+    if len(message_parts) > 1 and message_parts[1].strip():
+        logger.warning(f"[/setchannel] Unexpected arguments: {message_parts[1]}")
+        await message.reply_text("❌ /setchannel does not accept arguments.")
+        return
+
     bot_member = None
 
     # Only the bot owner can use this command
@@ -226,6 +233,13 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     logger.info(f"[/channelinfo] Received from user {user_id}")
 
     if not message:
+        return
+
+    message_text = (message.text or "").strip()
+    message_parts = message_text.split(maxsplit=1)
+    if len(message_parts) > 1 and message_parts[1].strip():
+        logger.warning(f"[/channelinfo] Unexpected arguments: {message_parts[1]}")
+        await message.reply_text("❌ /channelinfo does not accept arguments.")
         return
 
     # Only the bot owner can use this command
