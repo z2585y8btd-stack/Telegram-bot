@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -86,6 +87,7 @@ def load_store() -> dict[str, Any]:
 
 
 STORE = load_store()
+STORE_LOCK = asyncio.Lock()
 
 
 def save_store() -> None:
@@ -227,7 +229,7 @@ async def handle_pre_checkout_query(update: Update, context: ContextTypes.DEFAUL
     await query.answer(ok=True)
 
 
-def track_payment(message: Any, payment: Any) -> None:
+async def track_payment(message: Any, payment: Any) -> None:
     """Persist full payment details and latest subscription info for a user."""
     user = message.from_user
     user_id = user.id if user else 0
@@ -245,17 +247,18 @@ def track_payment(message: Any, payment: Any) -> None:
         "total_amount": payment.total_amount,
         "paid_at": paid_at,
     }
-    STORE["payments"].append(payment_record)
-    STORE["subscriptions"][user_key] = {
-        "status": "active",
-        "paid_at": paid_at,
-        "currency": payment.currency,
-        "total_amount": payment.total_amount,
-        "telegram_payment_charge_id": payment.telegram_payment_charge_id,
-        "provider_payment_charge_id": payment.provider_payment_charge_id,
-        "invoice_payload": payment.invoice_payload,
-    }
-    save_store()
+    async with STORE_LOCK:
+        STORE["payments"].append(payment_record)
+        STORE["subscriptions"][user_key] = {
+            "status": "active",
+            "paid_at": paid_at,
+            "currency": payment.currency,
+            "total_amount": payment.total_amount,
+            "telegram_payment_charge_id": payment.telegram_payment_charge_id,
+            "provider_payment_charge_id": payment.provider_payment_charge_id,
+            "invoice_payload": payment.invoice_payload,
+        }
+        save_store()
 
 
 async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> str:
@@ -265,7 +268,7 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
         invite = await context.bot.create_chat_invite_link(
             chat_id=PRIVATE_CHANNEL_CHAT_ID,
             expire_date=datetime.now(timezone.utc) + timedelta(hours=1),
-            member_limit=1,
+            creates_join_request=True,
             name=f"paid-user-{user_id}",
         )
         return invite.invite_link
@@ -274,11 +277,17 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
         return ""
 
 
+def format_payment_amount(total_amount: int, currency: str) -> str:
+    if currency == "XTR":
+        return f"{total_amount / 100:.2f} Stars"
+    return f"{total_amount} {currency}"
+
+
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.message
     if not message or not message.successful_payment:
         return
-    track_payment(message, message.successful_payment)
+    await track_payment(message, message.successful_payment)
     join_url = await generate_private_channel_join_url(context, message.from_user.id if message.from_user else 0)
     if not join_url:
         await message.reply_text(
@@ -293,7 +302,7 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     await message.reply_text(
         (
             "✅ تم تأكيد الدفع بنجاح!\n"
-            f"المبلغ: {message.successful_payment.total_amount} {message.successful_payment.currency}\n"
+            f"المبلغ: {format_payment_amount(message.successful_payment.total_amount, message.successful_payment.currency)}\n"
             "اضغط زر Join للدخول إلى القناة الخاصة."
         ),
         reply_markup=keyboard,
