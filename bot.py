@@ -303,7 +303,7 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
         (
             "✅ تم تأكيد الدفع بنجاح!\n"
             f"المبلغ: {format_payment_amount(message.successful_payment.total_amount, message.successful_payment.currency)}\n"
-            "اضغط زر Join للدخول إلى القناة الخاصة."
+            "اضغط زر Join لإرسال طلب الانضمام، وسيتم قبولك بعد موافقة الإدارة."
         ),
         reply_markup=keyboard,
     )

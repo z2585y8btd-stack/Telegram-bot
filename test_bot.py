@@ -1,9 +1,11 @@
 import os
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-os.environ["BOT_USER_STORE_FILE"] = "/tmp/telegram_bot_test_store.json"
+TEST_DIR = tempfile.mkdtemp(prefix="telegram_bot_tests_")
+os.environ["BOT_USER_STORE_FILE"] = os.path.join(TEST_DIR, "store.json")
 
 import bot
 
@@ -59,6 +61,8 @@ class PaymentFlowTests(unittest.IsolatedAsyncioTestCase):
 
     def test_format_xtr_amount(self) -> None:
         self.assertEqual(bot.format_payment_amount(1800, "XTR"), "1800 Stars")
+        self.assertEqual(bot.format_payment_amount(0, "XTR"), "0 Stars")
+        self.assertEqual(bot.format_payment_amount(1, "XTR"), "1 Stars")
         self.assertEqual(bot.format_payment_amount(250, "USD"), "250 USD")
 
 
