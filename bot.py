@@ -286,6 +286,19 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         log_admin_id_config_error("channelinfo", user_id)
         await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
         return
+
+    if user_id is None:
+        logger.warning(
+            "[/channelinfo] Access denied because executing user is unavailable. "
+            "executing_user_id=%s configured_ADMIN_ID=%s",
+            user_id,
+            ADMIN_ID,
+        )
+        await effective_message.reply_text(
+            "❌ Could not verify your user identity in this chat.\n"
+            "Please run /channelinfo from a context where your Telegram user ID is visible to the bot."
+        )
+        return
     
     # Only the bot owner can use this command
     if user_id != ADMIN_ID:
