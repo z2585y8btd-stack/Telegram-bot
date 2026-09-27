@@ -42,6 +42,7 @@ try:
     ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW else None
 except ValueError:
     ADMIN_ID = None
+ENABLE_MYID_COMMAND = get_env("ENABLE_MYID_COMMAND").lower() not in {"0", "false", "no"}
 ADMIN_ID_CONFIG_ERROR_TEXT = (
     "❌ Bot owner is not configured correctly.\n"
     "Set BOT_ADMIN_ID (or ADMIN_ID) to your numeric Telegram user ID."
@@ -569,7 +570,10 @@ def main() -> None:
     
     # Message/Channel post command handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("myid", myid))
+    if ENABLE_MYID_COMMAND:
+        application.add_handler(CommandHandler("myid", myid))
+    else:
+        logger.info("Skipping /myid command registration (ENABLE_MYID_COMMAND disabled)")
     application.add_handler(CommandHandler("setchannel", setchannel))
     application.add_handler(CommandHandler("channelinfo", channelinfo))
     
