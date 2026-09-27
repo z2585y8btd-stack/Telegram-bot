@@ -375,12 +375,12 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     try:
         await context.bot.send_invoice(
             chat_id=chat_id,
-            title="\u2063",
-            description="\u2063",
+            title="",
+            description="",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice("\u2063", PRIVATE_CHANNEL_STARS_AMOUNT)],
+            prices=[LabeledPrice("Subscription", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
