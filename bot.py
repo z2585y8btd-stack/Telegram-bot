@@ -180,25 +180,20 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     chat = effective_message.chat
     logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
 
-    owner_verified = user_id == ADMIN_ID
-    if not owner_verified and user_id is None and chat.type in (Chat.CHANNEL, Chat.SUPERGROUP, Chat.GROUP):
-        try:
-            owner_member = await context.bot.get_chat_member(chat.id, ADMIN_ID)
-            owner_verified = owner_member.status in ("creator", "administrator")
-            logger.info(
-                "[/setchannel] Fallback owner check in chat %s for ADMIN_ID=%s -> status=%s",
-                chat.id,
-                ADMIN_ID,
-                owner_member.status,
-            )
-        except Exception:
-            logger.exception(
-                "[/setchannel] Failed fallback owner check in chat %s for ADMIN_ID=%s",
-                chat.id,
-                ADMIN_ID,
-            )
+    if user_id is None:
+        logger.warning(
+            "[/setchannel] Access denied because executing user is unavailable. "
+            "executing_user_id=%s configured_ADMIN_ID=%s",
+            user_id,
+            ADMIN_ID,
+        )
+        await effective_message.reply_text(
+            "❌ Could not verify your user identity in this chat.\n"
+            "Please run /setchannel from a context where your Telegram user ID is visible to the bot."
+        )
+        return
 
-    if not owner_verified:
+    if user_id != ADMIN_ID:
         logger.warning(
             "[/setchannel] Access denied. executing_user_id=%s configured_ADMIN_ID=%s",
             user_id,
