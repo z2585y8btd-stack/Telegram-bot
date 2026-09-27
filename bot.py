@@ -42,7 +42,7 @@ try:
     ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW else None
 except ValueError:
     ADMIN_ID = None
-ENABLE_MYID_COMMAND = get_env("ENABLE_MYID_COMMAND").lower() not in {"0", "false", "no"}
+ENABLE_MYID_COMMAND = get_env("ENABLE_MYID_COMMAND").lower() in {"1", "true", "yes", "on"}
 ADMIN_ID_CONFIG_ERROR_TEXT = (
     "❌ Bot owner is not configured correctly.\n"
     "Set BOT_ADMIN_ID (or ADMIN_ID) to your numeric Telegram user ID."
