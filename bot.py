@@ -58,6 +58,25 @@ PRIVATE_CHANNEL_CHAT_ID = get_env("PRIVATE_CHANNEL_CHAT_ID")
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 TELEGRAM_PAYMENT_PROVIDER_TOKEN = get_env("TELEGRAM_PAYMENT_PROVIDER_TOKEN")
 MAX_HISTORY_MESSAGES = 20
+CURRENCY_EXPONENTS = {
+    "BIF": 0,
+    "CLP": 0,
+    "DJF": 0,
+    "GNF": 0,
+    "ISK": 0,
+    "JPY": 0,
+    "KMF": 0,
+    "KRW": 0,
+    "MGA": 0,
+    "PYG": 0,
+    "RWF": 0,
+    "UGX": 0,
+    "VND": 0,
+    "VUV": 0,
+    "XAF": 0,
+    "XOF": 0,
+    "XPF": 0,
+}
 
 WELCOME_MESSAGE = "✅ قبولهم تحت لا زال جاري حسب المتاح، وكل شيء يمشي بحكمة النظام وغموض الانتظار."
 
@@ -269,6 +288,7 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
             chat_id=PRIVATE_CHANNEL_CHAT_ID,
             expire_date=datetime.now(timezone.utc) + timedelta(hours=1),
             creates_join_request=True,
+            member_limit=1,
             name=f"paid-user-{user_id}",
         )
         return invite.invite_link
@@ -278,9 +298,13 @@ async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, 
 
 
 def format_payment_amount(total_amount: int, currency: str) -> str:
-    if currency == "XTR":
+    normalized_currency = (currency or "").upper()
+    if normalized_currency == "XTR":
         return f"{total_amount} Stars"
-    return f"{total_amount} {currency}"
+    exponent = CURRENCY_EXPONENTS.get(normalized_currency, 2)
+    if exponent == 0:
+        return f"{total_amount} {normalized_currency}"
+    return f"{total_amount / (10 ** exponent):.{exponent}f} {normalized_currency}"
 
 
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

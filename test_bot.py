@@ -63,7 +63,8 @@ class PaymentFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bot.format_payment_amount(1800, "XTR"), "1800 Stars")
         self.assertEqual(bot.format_payment_amount(0, "XTR"), "0 Stars")
         self.assertEqual(bot.format_payment_amount(1, "XTR"), "1 Stars")
-        self.assertEqual(bot.format_payment_amount(250, "USD"), "250 USD")
+        self.assertEqual(bot.format_payment_amount(250, "USD"), "2.50 USD")
+        self.assertEqual(bot.format_payment_amount(500, "jpy"), "500 JPY")
 
 
 if __name__ == "__main__":
