@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from telegram import Chat, Update, LabeledPrice
 from telegram.ext import (
     Application, ChatMemberHandler, CommandHandler, ContextTypes,
-    PreCheckoutQueryHandler, MessageHandler, filters,
+    PreCheckoutQueryHandler, MessageHandler, filters, TypeHandler,
 )
 
 load_dotenv()
@@ -46,8 +46,6 @@ PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 WEBHOOK_URL = get_env("WEBHOOK_URL")
 WEBHOOK_PORT = get_env_int("WEBHOOK_PORT", default=8443)
 WEBHOOK_PATH = "/webhook"
-
-ACCEPT_MESSAGE = "Accept✅"
 
 
 def load_store() -> dict[str, Any]:
@@ -109,24 +107,65 @@ async def get_target_channel_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[
     return channel_info.get("id")
 
 
+async def log_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log every incoming update for diagnostics."""
+    update_id = update.update_id
+    
+    # Determine update type
+    if update.channel_post:
+        update_type = "channel_post"
+        chat_id = update.channel_post.chat.id
+        text = update.channel_post.text or ""
+    elif update.edited_channel_post:
+        update_type = "edited_channel_post"
+        chat_id = update.edited_channel_post.chat.id
+        text = update.edited_channel_post.text or ""
+    elif update.message:
+        update_type = "message"
+        chat_id = update.message.chat.id
+        text = update.message.text or ""
+    elif update.my_chat_member:
+        update_type = "my_chat_member"
+        chat_id = update.my_chat_member.chat.id
+        text = ""
+    else:
+        update_type = "other"
+        chat_id = "?"
+        text = ""
+    
+    logger.info(f"[UPDATE] type={update_type} update_id={update_id} chat_id={chat_id}")
+    
+    # Log commands
+    if text.startswith("/"):
+        command = text.split()[0]
+        if update.channel_post or update.edited_channel_post:
+            logger.info(f"[CHANNEL COMMAND RECEIVED] {command} in chat {chat_id}")
+        else:
+            logger.info(f"[COMMAND RECEIVED] {command} from chat {chat_id}")
+
+
 async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set the current channel as the target payment channel (admin-only).
     
     Usage: Send /setchannel inside the channel where the bot is an admin.
     """
-    logger.info(f"[/setchannel] Received from user {update.message.from_user.id} in chat {update.message.chat.id}")
+    effective_message = update.effective_message
+    effective_user = update.effective_user
     
-    if not update.message:
+    if not effective_message:
         logger.warning("[/setchannel] No message object")
         return
     
+    user_id = effective_user.id if effective_user else None
+    logger.info(f"[/setchannel] Received from user {user_id} in chat {effective_message.chat.id}")
+    
     # Only the bot owner can use this command
-    if update.message.from_user.id != ADMIN_ID:
-        logger.warning(f"[/setchannel] Unauthorized user {update.message.from_user.id} tried to use /setchannel")
-        await update.message.reply_text("❌ Only the bot owner can use this command.")
+    if user_id != ADMIN_ID:
+        logger.warning(f"[/setchannel] Unauthorized user {user_id} tried to use /setchannel")
+        await effective_message.reply_text("❌ Only the bot owner can use this command.")
         return
     
-    chat = update.message.chat
+    chat = effective_message.chat
     logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
     
     # Command must be used in a channel (group or supergroup)
@@ -137,7 +176,7 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             f"Current chat type: {chat.type}\n"
             "Supported: Channel (CHANNEL), Supergroup (SUPERGROUP), or Group (GROUP)"
         )
-        await update.message.reply_text(error_msg)
+        await effective_message.reply_text(error_msg)
         return
     
     # Verify the bot is an admin in this chat
@@ -147,7 +186,7 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         if bot_member.status != "administrator":
             logger.error(f"[/setchannel] Bot is not an administrator in {chat.id}")
-            await update.message.reply_text("❌ The bot must be an administrator in this channel.")
+            await effective_message.reply_text("❌ The bot must be an administrator in this channel.")
             return
         
         # Check if bot has permission to manage invite links
@@ -156,13 +195,13 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         
         if not can_invite:
             logger.error(f"[/setchannel] Bot lacks can_invite_users permission in {chat.id}")
-            await update.message.reply_text(
+            await effective_message.reply_text(
                 "❌ The bot must have permission to manage invite links in this channel."
             )
             return
     except Exception as e:
         logger.exception(f"[/setchannel] Failed to verify bot admin status in {chat.id}")
-        await update.message.reply_text(f"❌ Error verifying bot permissions: {e}")
+        await effective_message.reply_text(f"❌ Error verifying bot permissions: {e}")
         return
     
     # Save this channel as the target
@@ -186,7 +225,7 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if username:
         confirmation += f"\nUsername: @{username}"
     
-    await update.message.reply_text(confirmation)
+    await effective_message.reply_text(confirmation)
 
 
 async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -194,21 +233,25 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     Usage: Send /channelinfo (works in any chat)
     """
-    logger.info(f"[/channelinfo] Received from user {update.message.from_user.id}")
+    effective_message = update.effective_message
+    effective_user = update.effective_user
     
-    if not update.message:
+    if not effective_message:
         return
     
+    user_id = effective_user.id if effective_user else None
+    logger.info(f"[/channelinfo] Received from user {user_id}")
+    
     # Only the bot owner can use this command
-    if update.message.from_user.id != ADMIN_ID:
-        logger.warning(f"[/channelinfo] Unauthorized user {update.message.from_user.id}")
-        await update.message.reply_text("❌ Only the bot owner can use this command.")
+    if user_id != ADMIN_ID:
+        logger.warning(f"[/channelinfo] Unauthorized user {user_id}")
+        await effective_message.reply_text("❌ Only the bot owner can use this command.")
         return
     
     target = STORE.get("target_channel")
     if not target:
         logger.info("[/channelinfo] No target channel configured")
-        await update.message.reply_text("ℹ️ No target channel configured yet.\n\nUse /setchannel in your target channel to register it.")
+        await effective_message.reply_text("ℹ️ No target channel configured yet.\n\nUse /setchannel in your target channel to register it.")
         return
     
     channel_id = target.get("id")
@@ -242,7 +285,7 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             f"{invite_emoji} Invite Links: {'Allowed' if can_invite else 'Denied'}"
         )
         
-        await update.message.reply_text(info)
+        await effective_message.reply_text(info)
     except Exception as e:
         logger.exception(f"[/channelinfo] Error checking permissions in {channel_id}")
         
@@ -256,7 +299,7 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         
         info += f"\n⚠️ Could not verify current bot permissions (Error: {e})"
         
-        await update.message.reply_text(info)
+        await effective_message.reply_text(info)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -264,7 +307,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
     chat_id = update.message.chat_id
-    await update.message.reply_text(ACCEPT_MESSAGE)
+    await update.message.reply_text("Accept✅")
     await send_private_channel_invoice(chat_id, context)
 
 
@@ -273,12 +316,12 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     try:
         await context.bot.send_invoice(
             chat_id=chat_id,
-            title=f"{PRIVATE_CHANNEL_STARS_AMOUNT} ⭐",
-            description=f"{PRIVATE_CHANNEL_STARS_AMOUNT} ⭐",
+            title="",
+            description="",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice(f"{PRIVATE_CHANNEL_STARS_AMOUNT} ⭐", PRIVATE_CHANNEL_STARS_AMOUNT)],
+            prices=[LabeledPrice(f"Pay ⭐{PRIVATE_CHANNEL_STARS_AMOUNT}", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
@@ -405,14 +448,52 @@ async def ignore_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def post_init(application: Application) -> None:
-    """Post init callback to set up webhook."""
+    """Post init callback to set up webhook and log diagnostics."""
     logger.info("🚀 Bot starting up...")
+    
+    # Log all registered handlers
+    logger.info("📋 Registered handlers:")
+    for group, handlers in application.handlers.items():
+        for handler in handlers:
+            if isinstance(handler, CommandHandler):
+                commands = ", ".join(sorted(handler.commands))
+                logger.info(f"  - CommandHandler (group {group}): /{commands}")
+            elif isinstance(handler, MessageHandler):
+                # Try to get filter description
+                filter_desc = str(handler.filters) if hasattr(handler, 'filters') else "unknown"
+                logger.info(f"  - MessageHandler (group {group}): {filter_desc}")
+            elif isinstance(handler, ChatMemberHandler):
+                logger.info(f"  - ChatMemberHandler (group {group}): my_chat_member")
+            elif isinstance(handler, PreCheckoutQueryHandler):
+                logger.info(f"  - PreCheckoutQueryHandler (group {group})")
+            elif isinstance(handler, TypeHandler):
+                logger.info(f"  - TypeHandler (group {group}): Update logging")
+            else:
+                logger.info(f"  - {handler.__class__.__name__} (group {group})")
+    
     await application.bot.set_my_commands([])
+    
     if WEBHOOK_URL:
-        await application.bot.set_webhook(url=f"{WEBHOOK_URL}{WEBHOOK_PATH}", drop_pending_updates=True)
+        # Set webhook with explicit allowed_updates
+        await application.bot.set_webhook(
+            url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES,
+        )
         logger.info(f"✅ Webhook set to {WEBHOOK_URL}{WEBHOOK_PATH}")
+        
+        # Verify webhook setup
+        try:
+            webhook_info = await application.bot.get_webhook_info()
+            logger.info(f"✅ Webhook verified:")
+            logger.info(f"   URL: {webhook_info.url}")
+            logger.info(f"   Allowed updates: {webhook_info.allowed_updates or 'all'}")
+            logger.info(f"   Pending update count: {webhook_info.pending_update_count}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not verify webhook info: {e}")
     else:
         logger.warning("⚠️ WEBHOOK_URL not set, using polling fallback")
+        logger.info(f"✅ Polling allowed_updates: {Update.ALL_TYPES}")
 
 
 def main() -> None:
@@ -420,9 +501,30 @@ def main() -> None:
         raise RuntimeError("No Telegram bot token found. Set TELEGRAM_BOT_TOKEN or BOT_TOKEN in the environment.")
 
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    
+    # Global update logger (highest priority: group -1)
+    application.add_handler(TypeHandler(Update, log_all_updates), group=-1)
+    
+    # Message/Channel post command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("setchannel", setchannel))
     application.add_handler(CommandHandler("channelinfo", channelinfo))
+    
+    # Channel post handlers for commands (using MessageHandler to match channel_post)
+    application.add_handler(
+        MessageHandler(
+            filters.UpdateType.CHANNEL_POST & filters.Regex(r"(?i)^/setchannel(@\w+)?\b"),
+            setchannel
+        )
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.UpdateType.CHANNEL_POST & filters.Regex(r"(?i)^/channelinfo(@\w+)?\b"),
+            channelinfo
+        )
+    )
+    
+    # Other handlers
     application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
     application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
@@ -436,6 +538,7 @@ def main() -> None:
             port=WEBHOOK_PORT,
             url_path=WEBHOOK_PATH,
             webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
+            allowed_updates=Update.ALL_TYPES,
         )
     else:
         logger.info("🚀 Starting bot with Polling mode...")
