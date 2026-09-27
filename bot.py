@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -53,6 +53,7 @@ ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 CHANNEL_URL = "https://t.me/+wgu9sZQ1RVExNTBk"
 PRIVATE_CHANNEL_URL = "https://t.me/+6VVYBI0I5LwxMGY0"
+PRIVATE_CHANNEL_CHAT_ID = get_env("PRIVATE_CHANNEL_CHAT_ID")
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 TELEGRAM_PAYMENT_PROVIDER_TOKEN = get_env("TELEGRAM_PAYMENT_PROVIDER_TOKEN")
 MAX_HISTORY_MESSAGES = 20
@@ -244,9 +245,26 @@ def track_payment(message: Any, payment: Any) -> None:
         "currency": payment.currency,
         "total_amount": payment.total_amount,
         "telegram_payment_charge_id": payment.telegram_payment_charge_id,
+        "provider_payment_charge_id": payment.provider_payment_charge_id,
         "invoice_payload": payment.invoice_payload,
     }
     save_store()
+
+
+async def generate_private_channel_join_url(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> str:
+    if not PRIVATE_CHANNEL_CHAT_ID:
+        return PRIVATE_CHANNEL_URL
+    try:
+        invite = await context.bot.create_chat_invite_link(
+            chat_id=PRIVATE_CHANNEL_CHAT_ID,
+            expire_date=datetime.now(timezone.utc) + timedelta(hours=1),
+            member_limit=1,
+            name=f"paid-user-{user_id}",
+        )
+        return invite.invite_link
+    except Exception:
+        logger.exception("Could not create single-use invite link; falling back to default URL")
+        return PRIVATE_CHANNEL_URL
 
 
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -254,8 +272,9 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     if not message or not message.successful_payment:
         return
     track_payment(message, message.successful_payment)
+    join_url = await generate_private_channel_join_url(context, message.from_user.id if message.from_user else 0)
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Join", url=PRIVATE_CHANNEL_URL)],
+        [InlineKeyboardButton("Join", url=join_url)],
     ])
     await message.reply_text(
         (
