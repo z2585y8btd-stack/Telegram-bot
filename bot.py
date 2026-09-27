@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from telegram import Chat, Update, LabeledPrice
 from telegram.ext import (
     Application, ChatMemberHandler, CommandHandler, ContextTypes,
-    PreCheckoutQueryHandler, MessageHandler, filters,
+    PreCheckoutQueryHandler, MessageHandler, TypeHandler, filters,
 )
 
 load_dotenv()
@@ -114,19 +114,42 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     
     Usage: Send /setchannel inside the channel where the bot is an admin.
     """
-    logger.info(f"[/setchannel] Received from user {update.message.from_user.id} in chat {update.message.chat.id}")
-    
-    if not update.message:
+    message = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
+    user_id = user.id if user else "anonymous"
+
+    logger.info(f"[/setchannel] Received from user {user_id} in chat {chat.id if chat else 'unknown'}")
+
+    if not message or not chat:
         logger.warning("[/setchannel] No message object")
         return
-    
+
+    bot_member = None
+
     # Only the bot owner can use this command
-    if update.message.from_user.id != ADMIN_ID:
-        logger.warning(f"[/setchannel] Unauthorized user {update.message.from_user.id} tried to use /setchannel")
-        await update.message.reply_text("❌ Only the bot owner can use this command.")
-        return
-    
-    chat = update.message.chat
+    if user:
+        if user.id != ADMIN_ID:
+            logger.warning(f"[/setchannel] Unauthorized user {user.id} tried to use /setchannel")
+            await message.reply_text("❌ Only the bot owner can use this command.")
+            return
+    else:
+        if not (chat.type == Chat.CHANNEL or str(chat.id).startswith("-100")):
+            logger.warning(f"[/setchannel] Anonymous update from unsupported chat type {chat.type}")
+            await message.reply_text("❌ Only the bot owner can use this command.")
+            return
+        try:
+            bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+            if bot_member.status != "administrator":
+                logger.warning(f"[/setchannel] Anonymous authorization denied: bot is not admin in {chat.id}")
+                await message.reply_text("❌ Only the bot owner can use this command.")
+                return
+            logger.warning(f"[/setchannel] Anonymous channel authorization used in chat {chat.id}")
+        except Exception as e:
+            logger.exception(f"[/setchannel] Failed anonymous authorization check in {chat.id}")
+            await message.reply_text(f"❌ Error verifying bot permissions: {e}")
+            return
+
     logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
     
     # Command must be used in a channel (group or supergroup)
@@ -137,34 +160,35 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             f"Current chat type: {chat.type}\n"
             "Supported: Channel (CHANNEL), Supergroup (SUPERGROUP), or Group (GROUP)"
         )
-        await update.message.reply_text(error_msg)
+        await message.reply_text(error_msg)
         return
-    
+
     # Verify the bot is an admin in this chat
     try:
-        bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+        if bot_member is None:
+            bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
         logger.info(f"[/setchannel] Bot status in {chat.id}: {bot_member.status}")
-        
+
         if bot_member.status != "administrator":
             logger.error(f"[/setchannel] Bot is not an administrator in {chat.id}")
-            await update.message.reply_text("❌ The bot must be an administrator in this channel.")
+            await message.reply_text("❌ The bot must be an administrator in this channel.")
             return
-        
+
         # Check if bot has permission to manage invite links
         can_invite = getattr(bot_member, "can_invite_users", False)
         logger.info(f"[/setchannel] Bot can_invite_users permission: {can_invite}")
-        
+
         if not can_invite:
             logger.error(f"[/setchannel] Bot lacks can_invite_users permission in {chat.id}")
-            await update.message.reply_text(
+            await message.reply_text(
                 "❌ The bot must have permission to manage invite links in this channel."
             )
             return
     except Exception as e:
         logger.exception(f"[/setchannel] Failed to verify bot admin status in {chat.id}")
-        await update.message.reply_text(f"❌ Error verifying bot permissions: {e}")
+        await message.reply_text(f"❌ Error verifying bot permissions: {e}")
         return
-    
+
     # Save this channel as the target
     channel_title = chat.title or chat.name or f"Channel {chat.id}"
     STORE["target_channel"] = {
@@ -185,8 +209,8 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     confirmation = f"✅ Channel registered successfully\nChannel: {title}\nChannel ID: {channel_id}"
     if username:
         confirmation += f"\nUsername: @{username}"
-    
-    await update.message.reply_text(confirmation)
+
+    await message.reply_text(confirmation)
 
 
 async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -194,23 +218,45 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     Usage: Send /channelinfo (works in any chat)
     """
-    logger.info(f"[/channelinfo] Received from user {update.message.from_user.id}")
-    
-    if not update.message:
+    message = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
+    user_id = user.id if user else "anonymous"
+
+    logger.info(f"[/channelinfo] Received from user {user_id}")
+
+    if not message:
         return
-    
+
     # Only the bot owner can use this command
-    if update.message.from_user.id != ADMIN_ID:
-        logger.warning(f"[/channelinfo] Unauthorized user {update.message.from_user.id}")
-        await update.message.reply_text("❌ Only the bot owner can use this command.")
-        return
-    
+    if user:
+        if user.id != ADMIN_ID:
+            logger.warning(f"[/channelinfo] Unauthorized user {user.id}")
+            await message.reply_text("❌ Only the bot owner can use this command.")
+            return
+    else:
+        if not chat or not (chat.type == Chat.CHANNEL or str(chat.id).startswith("-100")):
+            logger.warning("[/channelinfo] Anonymous update from unsupported chat")
+            await message.reply_text("❌ Only the bot owner can use this command.")
+            return
+        try:
+            bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+            if bot_member.status != "administrator":
+                logger.warning(f"[/channelinfo] Anonymous authorization denied in {chat.id}")
+                await message.reply_text("❌ Only the bot owner can use this command.")
+                return
+            logger.warning(f"[/channelinfo] Anonymous channel authorization used in chat {chat.id}")
+        except Exception as e:
+            logger.exception(f"[/channelinfo] Failed anonymous authorization check in {chat.id}")
+            await message.reply_text(f"❌ Error verifying bot permissions: {e}")
+            return
+
     target = STORE.get("target_channel")
     if not target:
         logger.info("[/channelinfo] No target channel configured")
-        await update.message.reply_text("ℹ️ No target channel configured yet.\n\nUse /setchannel in your target channel to register it.")
+        await message.reply_text("ℹ️ No target channel configured yet.\n\nUse /setchannel in your target channel to register it.")
         return
-    
+
     channel_id = target.get("id")
     channel_title = target.get("title", "Unknown")
     channel_username = target.get("username", "")
@@ -242,10 +288,10 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             f"{invite_emoji} Invite Links: {'Allowed' if can_invite else 'Denied'}"
         )
         
-        await update.message.reply_text(info)
+        await message.reply_text(info)
     except Exception as e:
         logger.exception(f"[/channelinfo] Error checking permissions in {channel_id}")
-        
+
         info = (
             f"📋 Saved Target Channel\n\n"
             f"Channel: {channel_title}\n"
@@ -253,10 +299,10 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         if channel_username:
             info += f"Username: @{channel_username}\n"
-        
+
         info += f"\n⚠️ Could not verify current bot permissions (Error: {e})"
-        
-        await update.message.reply_text(info)
+
+        await message.reply_text(info)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -404,13 +450,79 @@ async def ignore_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     return
 
 
+def extract_command_text(update: Update) -> Optional[str]:
+    message = update.effective_message
+    if not message:
+        return None
+    text = message.text or message.caption or ""
+    text = text.strip()
+    if not text.startswith("/"):
+        return None
+    return text.split()[0]
+
+
+async def log_incoming_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message:
+        update_type = "message"
+    elif update.channel_post:
+        update_type = "channel_post"
+    elif update.edited_channel_post:
+        update_type = "edited_channel_post"
+    elif update.my_chat_member:
+        update_type = "my_chat_member"
+    else:
+        update_type = "other"
+
+    logger.info("[UPDATE RECEIVED] type=%s update_id=%s", update_type, update.update_id)
+
+    command = extract_command_text(update)
+    if not command:
+        return
+
+    logger.info("[COMMAND RECEIVED] %s from update_id=%s", command, update.update_id)
+    chat = update.effective_chat
+    if update.channel_post and chat and (chat.type == Chat.CHANNEL or str(chat.id).startswith("-100")):
+        logger.info("[CHANNEL COMMAND RECEIVED] %s in chat %s", command, chat.id)
+
+
+def log_registered_handlers(application: Application) -> None:
+    logger.info("📋 Registered handlers:")
+    for group in sorted(application.handlers):
+        for handler in application.handlers[group]:
+            if isinstance(handler, CommandHandler):
+                commands = ", ".join(f"/{command}" for command in handler.commands)
+                logger.info("  - CommandHandler: %s", commands)
+            elif isinstance(handler, MessageHandler):
+                if handler.callback == setchannel:
+                    logger.info("  - MessageHandler (channel post): /setchannel [%s]", handler.filters)
+                elif handler.callback == channelinfo:
+                    logger.info("  - MessageHandler (channel post): /channelinfo [%s]", handler.filters)
+                else:
+                    logger.info("  - MessageHandler: %s", handler.filters)
+            elif isinstance(handler, ChatMemberHandler):
+                chat_member_type = "my_chat_member" if handler.chat_member_types == ChatMemberHandler.MY_CHAT_MEMBER else "chat_member"
+                logger.info("  - ChatMemberHandler: %s", chat_member_type)
+            elif isinstance(handler, TypeHandler):
+                type_name = getattr(handler.type, "__name__", str(handler.type))
+                logger.info("  - TypeHandler: %s", type_name)
+            else:
+                logger.info("  - %s", handler.__class__.__name__)
+
+
 async def post_init(application: Application) -> None:
     """Post init callback to set up webhook."""
     logger.info("🚀 Bot starting up...")
+    log_registered_handlers(application)
     await application.bot.set_my_commands([])
     if WEBHOOK_URL:
-        await application.bot.set_webhook(url=f"{WEBHOOK_URL}{WEBHOOK_PATH}", drop_pending_updates=True)
+        await application.bot.set_webhook(
+            url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES,
+        )
+        webhook_info = await application.bot.get_webhook_info()
         logger.info(f"✅ Webhook set to {WEBHOOK_URL}{WEBHOOK_PATH}")
+        logger.info("📡 Webhook allowed_updates: %s", webhook_info.allowed_updates)
     else:
         logger.warning("⚠️ WEBHOOK_URL not set, using polling fallback")
 
@@ -420,9 +532,22 @@ def main() -> None:
         raise RuntimeError("No Telegram bot token found. Set TELEGRAM_BOT_TOKEN or BOT_TOKEN in the environment.")
 
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    application.add_handler(TypeHandler(Update, log_incoming_update), group=-1)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("setchannel", setchannel))
     application.add_handler(CommandHandler("channelinfo", channelinfo))
+    application.add_handler(
+        MessageHandler(
+            filters.UpdateType.CHANNEL_POSTS & filters.TEXT & filters.Regex(r"(?i)^\s*/setchannel(@\w+)?\b"),
+            setchannel,
+        )
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.UpdateType.CHANNEL_POSTS & filters.TEXT & filters.Regex(r"(?i)^\s*/channelinfo(@\w+)?\b"),
+            channelinfo,
+        )
+    )
     application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
     application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
@@ -436,9 +561,11 @@ def main() -> None:
             port=WEBHOOK_PORT,
             url_path=WEBHOOK_PATH,
             webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
+            allowed_updates=Update.ALL_TYPES,
         )
     else:
         logger.info("🚀 Starting bot with Polling mode...")
+        logger.info("Allowed updates for polling: %s", Update.ALL_TYPES)
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
