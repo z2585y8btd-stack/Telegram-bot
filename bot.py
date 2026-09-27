@@ -58,7 +58,7 @@ MAX_HISTORY_MESSAGES = 20
 WELCOME_MESSAGE = "✅ قبولهم تحت لا زال جاري حسب المتاح، وكل شيء يمشي بحكمة النظام وغموض الانتظار."
 
 SYSTEM_PROMPT = """أنت بوت تيليجرام سعودي خفيف دم، يحب الفلسفة والهذرة العشوائية.
-أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية. خل ردودك فلسفية وعبثية ومليئة بالتأملات عن الحياة والانتظار والوقت، حتى لو كان سؤال المستخدم عاديًا، لكن اجعلها لطيفة ومضحكة ومفهومة.
+أجب باللهجة السعودية إذا كان المستخدم يتحدث بالعربية. خل ردودك فلسفية وعبثية ومليئة بالتأملات عن الحياة واللاشيء.
 استخدم أحيانًا عبارات مثل: قبولهم تحت لا زال جاري حسب المتاح، فالانتظار ليس تأخيرًا بل اجتماعًا سريًا بين الوقت والصبر.
 لا تدّعِ تنفيذ إجراءات حقيقية، ولا تخترع معلومات مهمة. إذا طلب المستخدم رابط القناة فجاوبه بالرابط، وإذا سأل وش نوعك أو ما نوعك فأجب حرفيًا: انا بوت اقصد بوث 😝.
 لا تستخدم محتوى جنسيًا صريحًا أو يستغل القاصرين أو يتضمن إكراهًا."""
@@ -136,7 +136,7 @@ def local_smart_reply(text: str) -> str:
         return "العفو يا بعدي 🥹 الشكر دائرة تدور ثم تعود لصاحبها، مثل الأفكار وقت النوم، وقبولهم تحت لا زال جاري حسب المتاح."
     if re.search(r"\b(help|مساعدة|وش تقدر|ماذا تستطيع)\b", normalized):
         return "أقدر أهذر لك وأرسل رابط القناة وأحوّل أبسط سؤال إلى رحلة فلسفية لا نعرف بدايتها ولا سبب استمرارها."
-    return "اسمع، الحياة مثل زر الإرسال: تضغطه وأنت لا تعرف هل سيصل المعنى أم سيصل مجرد إشعار. قبولهم تحت لا زال جاري حسب المتاح، والوقت يمشي حافيًا بين دقيقة ودقيقة، أما أنا فهنا أهذر لأن الصمت أحيانًا يحتاج تعليقًا لا علاقة له بالموضوع."
+    return "اسمع، الحياة مثل زر الإرسال: تضغطه وأنت لا تعرف هل سيصل المعنى أم سيصل مجرد إشعار. قبولهم تحت لا زال جاري حسب المتاح."
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -175,46 +175,82 @@ async def people(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await context.bot.send_invoice(
-        chat_id=chat_id,
-        title="Subscribe",
-        description="",
-        payload="private_channel_subscription",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice("Private Channel Subscription", PRIVATE_CHANNEL_STARS_AMOUNT)],
-    )
+    """Send Telegram Stars payment invoice for private channel subscription"""
+    try:
+        await context.bot.send_invoice(
+            chat_id=chat_id,
+            title="Subscribe",
+            description="",
+            payload="private_channel_subscription",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice("Private Channel Subscription", PRIVATE_CHANNEL_STARS_AMOUNT)],
+        )
+        logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
+    except Exception as e:
+        logger.error(f"Failed to send invoice to {chat_id}: {e}")
 
 
 async def handle_private_channel_subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Private Channel subscription button click"""
     query = update.callback_query
     if not query:
         return
     await query.answer()
     chat_id = query.message.chat_id if query.message else query.from_user.id
+    logger.info(f"User {chat_id} clicked Private Channel subscription button")
     await send_private_channel_invoice(chat_id, context)
 
 
 async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /subscribe command"""
     if not update.message:
         return
+    logger.info(f"User {update.message.chat_id} used /subscribe command")
     await send_private_channel_invoice(update.message.chat_id, context)
 
 
 async def handle_pre_checkout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Approve the pre-checkout query"""
     query = update.pre_checkout_query
     if not query:
         return
+    logger.info(f"Pre-checkout query from user {query.from_user.id}: {query.invoice_payload}")
     await query.answer(ok=True)
 
 
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle successful payment and provide channel link"""
     message = update.message
     if not message or not message.successful_payment:
         return
+    
+    user_id = message.from_user.id if message.from_user else None
+    payment = message.successful_payment
+    
+    # Log payment info
+    logger.info(f"Payment received from user {user_id}: {payment.total_amount} XTR, ID: {payment.telegram_payment_charge_id}")
+    
+    # Track the payment in STORE
+    if user_id:
+        record = user_record(user_id, message.from_user)
+        payment_record = {
+            "user_id": user_id,
+            "person_number": record.get("person_number"),
+            "amount": payment.total_amount,
+            "currency": payment.currency,
+            "telegram_payment_id": payment.telegram_payment_charge_id,
+            "provider_payment_id": payment.provider_payment_charge_id or "N/A",
+            "timestamp": str(__import__('datetime').datetime.now()),
+        }
+        STORE["payments"].append(payment_record)
+        save_store()
+    
+    # Send confirmation with link button
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Join", url=PRIVATE_CHANNEL_URL)],
     ])
+    
     await message.reply_text(
         "رابط القناة",
         reply_markup=keyboard,
