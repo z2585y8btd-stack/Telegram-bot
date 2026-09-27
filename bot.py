@@ -125,6 +125,43 @@ def log_admin_id_config_error(command: str, user_id: Optional[int]) -> None:
     )
 
 
+async def ensure_owner_access(
+    command: str,
+    effective_message: Any,
+    user_id: Optional[int],
+) -> bool:
+    if ADMIN_ID is None:
+        log_admin_id_config_error(command, user_id)
+        await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
+        return False
+
+    if user_id is None:
+        logger.warning(
+            "[/%s] Access denied because executing user is unavailable. "
+            "executing_user_id=%s configured_ADMIN_ID=%s",
+            command,
+            user_id,
+            ADMIN_ID,
+        )
+        await effective_message.reply_text(
+            f"❌ Could not verify your user identity for /{command}.\n"
+            "Please run this command from a context where your Telegram user ID is visible to the bot."
+        )
+        return False
+
+    if user_id != ADMIN_ID:
+        logger.warning(
+            "[/%s] Access denied. executing_user_id=%s configured_ADMIN_ID=%s",
+            command,
+            user_id,
+            ADMIN_ID,
+        )
+        await effective_message.reply_text("❌ Only the bot owner can use this command.")
+        return False
+
+    return True
+
+
 async def log_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log every incoming update for diagnostics."""
     update_id = update.update_id
@@ -177,37 +214,13 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user_id = effective_user.id if effective_user else None
     logger.info(f"[/setchannel] Received from user {user_id} in chat {effective_message.chat.id}")
 
-    if ADMIN_ID is None:
-        log_admin_id_config_error("setchannel", user_id)
-        await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
+    if not await ensure_owner_access("setchannel", effective_message, user_id):
         return
     
     # Only the bot owner can use this command
     chat = effective_message.chat
     logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
 
-    if user_id is None:
-        logger.warning(
-            "[/setchannel] Access denied because executing user is unavailable. "
-            "executing_user_id=%s configured_ADMIN_ID=%s",
-            user_id,
-            ADMIN_ID,
-        )
-        await effective_message.reply_text(
-            "❌ Could not verify your user identity in this chat.\n"
-            "Please run /setchannel from a context where your Telegram user ID is visible to the bot."
-        )
-        return
-
-    if user_id != ADMIN_ID:
-        logger.warning(
-            "[/setchannel] Access denied. executing_user_id=%s configured_ADMIN_ID=%s",
-            user_id,
-            ADMIN_ID,
-        )
-        await effective_message.reply_text("❌ Only the bot owner can use this command.")
-        return
-    
     # Command must be used in a channel (group or supergroup)
     if chat.type not in (Chat.CHANNEL, Chat.SUPERGROUP, Chat.GROUP):
         logger.error(f"[/setchannel] Invalid chat type: {chat.type}. Supported: CHANNEL, SUPERGROUP, GROUP")
@@ -282,28 +295,7 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user_id = effective_user.id if effective_user else None
     logger.info(f"[/channelinfo] Received from user {user_id}")
 
-    if ADMIN_ID is None:
-        log_admin_id_config_error("channelinfo", user_id)
-        await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
-        return
-
-    if user_id is None:
-        logger.warning(
-            "[/channelinfo] Access denied because executing user is unavailable. "
-            "executing_user_id=%s configured_ADMIN_ID=%s",
-            user_id,
-            ADMIN_ID,
-        )
-        await effective_message.reply_text(
-            "❌ Could not verify your user identity in this chat.\n"
-            "Please run /channelinfo from a context where your Telegram user ID is visible to the bot."
-        )
-        return
-    
-    # Only the bot owner can use this command
-    if user_id != ADMIN_ID:
-        logger.warning(f"[/channelinfo] Unauthorized user {user_id}")
-        await effective_message.reply_text("❌ Only the bot owner can use this command.")
+    if not await ensure_owner_access("channelinfo", effective_message, user_id):
         return
     
     target = STORE.get("target_channel")
