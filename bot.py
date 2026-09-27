@@ -67,6 +67,14 @@ def load_store() -> dict[str, Any]:
     default.setdefault("payments", [])
     default.setdefault("invite_links", {})
     default.setdefault("target_channel", None)
+    
+    # Log loaded target channel on startup
+    target = default.get("target_channel")
+    if target:
+        logger.info(f"✅ Loaded saved target channel: {target.get('title')} (ID: {target.get('id')})")
+    else:
+        logger.warning("⚠️ No target channel configured in store")
+    
     return default
 
 
@@ -106,46 +114,67 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     
     Usage: Send /setchannel inside the channel where the bot is an admin.
     """
+    logger.info(f"[/setchannel] Received from user {update.message.from_user.id} in chat {update.message.chat.id}")
+    
     if not update.message:
+        logger.warning("[/setchannel] No message object")
         return
     
     # Only the bot owner can use this command
     if update.message.from_user.id != ADMIN_ID:
+        logger.warning(f"[/setchannel] Unauthorized user {update.message.from_user.id} tried to use /setchannel")
         await update.message.reply_text("❌ Only the bot owner can use this command.")
         return
     
-    # Command must be used in a channel (group or supergroup)
     chat = update.message.chat
+    logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
+    
+    # Command must be used in a channel (group or supergroup)
     if chat.type not in (Chat.CHANNEL, Chat.SUPERGROUP, Chat.GROUP):
-        await update.message.reply_text("❌ This command must be used inside a channel or group.")
+        logger.error(f"[/setchannel] Invalid chat type: {chat.type}. Supported: CHANNEL, SUPERGROUP, GROUP")
+        error_msg = (
+            "❌ This command must be used inside a channel or group.\n\n"
+            f"Current chat type: {chat.type}\n"
+            "Supported: Channel (CHANNEL), Supergroup (SUPERGROUP), or Group (GROUP)"
+        )
+        await update.message.reply_text(error_msg)
         return
     
     # Verify the bot is an admin in this chat
     try:
         bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+        logger.info(f"[/setchannel] Bot status in {chat.id}: {bot_member.status}")
+        
         if bot_member.status != "administrator":
+            logger.error(f"[/setchannel] Bot is not an administrator in {chat.id}")
             await update.message.reply_text("❌ The bot must be an administrator in this channel.")
             return
         
         # Check if bot has permission to manage invite links
         can_invite = getattr(bot_member, "can_invite_users", False)
+        logger.info(f"[/setchannel] Bot can_invite_users permission: {can_invite}")
+        
         if not can_invite:
+            logger.error(f"[/setchannel] Bot lacks can_invite_users permission in {chat.id}")
             await update.message.reply_text(
                 "❌ The bot must have permission to manage invite links in this channel."
             )
             return
     except Exception as e:
-        logger.exception(f"Failed to verify bot admin status in {chat.id}")
+        logger.exception(f"[/setchannel] Failed to verify bot admin status in {chat.id}")
         await update.message.reply_text(f"❌ Error verifying bot permissions: {e}")
         return
     
     # Save this channel as the target
+    channel_title = chat.title or chat.name or f"Channel {chat.id}"
     STORE["target_channel"] = {
         "id": chat.id,
-        "title": chat.title or chat.name or f"Channel {chat.id}",
+        "title": channel_title,
         "username": chat.username or "",
     }
     save_store()
+    
+    logger.info(f"[/setchannel] ✅ Channel saved: {channel_title} (ID: {chat.id})")
     
     # Confirm to the owner
     channel_info = STORE["target_channel"]
@@ -153,12 +182,81 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     channel_id = channel_info["id"]
     username = channel_info.get("username", "")
     
-    confirmation = f"✅ Channel set as target for payments!\n\nTitle: {title}\nChat ID: {channel_id}"
+    confirmation = f"✅ Channel registered successfully\nChannel: {title}\nChannel ID: {channel_id}"
     if username:
         confirmation += f"\nUsername: @{username}"
     
     await update.message.reply_text(confirmation)
-    logger.info(f"Target channel set by admin: {title} ({channel_id})")
+
+
+async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show information about the saved target channel and bot permissions.
+    
+    Usage: Send /channelinfo (works in any chat)
+    """
+    logger.info(f"[/channelinfo] Received from user {update.message.from_user.id}")
+    
+    if not update.message:
+        return
+    
+    # Only the bot owner can use this command
+    if update.message.from_user.id != ADMIN_ID:
+        logger.warning(f"[/channelinfo] Unauthorized user {update.message.from_user.id}")
+        await update.message.reply_text("❌ Only the bot owner can use this command.")
+        return
+    
+    target = STORE.get("target_channel")
+    if not target:
+        logger.info("[/channelinfo] No target channel configured")
+        await update.message.reply_text("ℹ️ No target channel configured yet.\n\nUse /setchannel in your target channel to register it.")
+        return
+    
+    channel_id = target.get("id")
+    channel_title = target.get("title", "Unknown")
+    channel_username = target.get("username", "")
+    
+    logger.info(f"[/channelinfo] Checking bot permissions in channel {channel_id}")
+    
+    # Try to verify current bot permissions
+    try:
+        bot_member = await context.bot.get_chat_member(channel_id, context.bot.id)
+        status = bot_member.status
+        can_invite = getattr(bot_member, "can_invite_users", False)
+        
+        logger.info(f"[/channelinfo] Bot status: {status}, can_invite: {can_invite}")
+        
+        status_emoji = "✅" if status == "administrator" else "⚠️"
+        invite_emoji = "✅" if can_invite else "❌"
+        
+        info = (
+            f"📋 Saved Target Channel\n\n"
+            f"Channel: {channel_title}\n"
+            f"Channel ID: {channel_id}\n"
+        )
+        if channel_username:
+            info += f"Username: @{channel_username}\n"
+        
+        info += (
+            f"\n🤖 Bot Permissions\n"
+            f"{status_emoji} Admin Status: {status}\n"
+            f"{invite_emoji} Invite Links: {'Allowed' if can_invite else 'Denied'}"
+        )
+        
+        await update.message.reply_text(info)
+    except Exception as e:
+        logger.exception(f"[/channelinfo] Error checking permissions in {channel_id}")
+        
+        info = (
+            f"📋 Saved Target Channel\n\n"
+            f"Channel: {channel_title}\n"
+            f"Channel ID: {channel_id}\n"
+        )
+        if channel_username:
+            info += f"Username: @{channel_username}\n"
+        
+        info += f"\n⚠️ Could not verify current bot permissions (Error: {e})"
+        
+        await update.message.reply_text(info)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -308,6 +406,7 @@ async def ignore_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def post_init(application: Application) -> None:
     """Post init callback to set up webhook."""
+    logger.info("🚀 Bot starting up...")
     await application.bot.set_my_commands([])
     if WEBHOOK_URL:
         await application.bot.set_webhook(url=f"{WEBHOOK_URL}{WEBHOOK_PATH}", drop_pending_updates=True)
@@ -323,6 +422,7 @@ def main() -> None:
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("setchannel", setchannel))
+    application.add_handler(CommandHandler("channelinfo", channelinfo))
     application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_successful_payment))
     application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
