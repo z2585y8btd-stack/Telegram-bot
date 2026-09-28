@@ -316,7 +316,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.message.chat_id
     
     # Minimal, neutral acknowledgment (no marketing language)
-    await update.message.reply_text("Accept✅\nPress the button below.")
+    
     
     # Send the payment invoice
     await send_private_channel_invoice(chat_id, context)
@@ -328,7 +328,7 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
         await context.bot.send_invoice(
             chat_id=chat_id,
             title="Private Channel",
-            description="Premium Access",
+            description="🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
