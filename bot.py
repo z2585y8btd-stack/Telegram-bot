@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-from telegram import Chat, Update, LabeledPrice
+from telegram import Chat, Update, LabeledPrice, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     Application, ChatMemberHandler, CommandHandler, ContextTypes,
     PreCheckoutQueryHandler, MessageHandler, filters, TypeHandler,
@@ -303,11 +303,23 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Default /start handler: send Accept✅ message, then the Stars payment invoice."""
+    """Default /start handler: send welcome message with payment button."""
     if not update.message:
         return
     chat_id = update.message.chat_id
-    await update.message.reply_text("Accept✅")
+    
+    # Send welcome message
+    welcome_text = (
+        "🎉 Welcome to Premium Access!\n\n"
+        "📌 Get instant access to exclusive content\n"
+        "💎 Unlock premium features\n"
+        "⭐ Enjoy unlimited benefits\n\n"
+        "Click the button below to proceed with payment."
+    )
+    
+    await update.message.reply_text(welcome_text)
+    
+    # Send the payment invoice
     await send_private_channel_invoice(chat_id, context)
 
 
@@ -316,16 +328,23 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     try:
         await context.bot.send_invoice(
             chat_id=chat_id,
-            title="",
-            description="",
+            title="🌟 Premium Channel Access",
+            description="Get exclusive access to premium content and features. One-time payment for lifetime access.",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice(f"Pay ⭐{PRIVATE_CHANNEL_STARS_AMOUNT}", PRIVATE_CHANNEL_STARS_AMOUNT)],
+            prices=[LabeledPrice(f"Premium Access - ⭐{PRIVATE_CHANNEL_STARS_AMOUNT}", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
         logger.error(f"Failed to send invoice to {chat_id}: {e}")
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="❌ Payment system is temporarily unavailable. Please try again later."
+            )
+        except Exception as fallback_error:
+            logger.error(f"Failed to send fallback message: {fallback_error}")
 
 
 async def handle_pre_checkout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -386,16 +405,19 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     if not channel_id:
         logger.error("No target channel configured; payment flow stopped")
         await message.reply_text(
-            "Payment received, but the invite link could not be created. Please contact support."
+            "✅ Payment successful!\n\n"
+            "⚠️ However, the invite link could not be generated at this moment.\n"
+            "Please contact support for assistance."
         )
         if ADMIN_ID:
             try:
                 await context.bot.send_message(
                     chat_id=ADMIN_ID,
                     text=(
+                        "🚨 Payment Notification\n\n"
                         "⚠️ No target payment channel has been configured.\n"
-                        "Use /setchannel in the channel where the bot should send invite links.\n"
-                        f"Payment from user {user_id} was received but no invite link was issued."
+                        "Use /setchannel in the channel where the bot should send invite links.\n\n"
+                        f"👤 Payment from user {user_id} was received but no invite link was issued."
                     ),
                 )
             except Exception:
@@ -405,9 +427,20 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     invite_link = await create_unique_invite_link(context, channel_id, user_id) if user_id else None
 
     if invite_link:
-        await message.reply_text(invite_link)
+        success_message = (
+            "✅ Payment Successful!\n\n"
+            "🎉 Your premium access is now active!\n"
+            "📌 Click the link below to join the exclusive channel:\n\n"
+            f"{invite_link}\n\n"
+            "💡 This link is personal and can only be used once."
+        )
+        await message.reply_text(success_message)
     else:
-        await message.reply_text("Payment received, but the invite link could not be created. Please contact support.")
+        await message.reply_text(
+            "✅ Payment received successfully!\n\n"
+            "❌ Unfortunately, the invite link could not be created.\n"
+            "Please try again or contact support."
+        )
 
 
 async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
