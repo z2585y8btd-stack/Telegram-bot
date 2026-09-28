@@ -37,7 +37,16 @@ def get_env_int(name: str, *aliases: str, default: int) -> int:
 
 
 BOT_TOKEN = get_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN", "TELEGRAM_TOKEN")
-ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
+ADMIN_ID_RAW = get_env("BOT_ADMIN_ID", "ADMIN_ID")
+try:
+    ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW else None
+except ValueError:
+    ADMIN_ID = None
+ENABLE_MYID_COMMAND = (get_env("ENABLE_MYID_COMMAND") or "1").lower() in {"1", "true", "yes", "on"}
+ADMIN_ID_CONFIG_ERROR_TEXT = (
+    "❌ Bot owner is not configured correctly.\n"
+    "Set BOT_ADMIN_ID (or ADMIN_ID) to your numeric Telegram user ID."
+)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
@@ -107,6 +116,53 @@ async def get_target_channel_id(context: ContextTypes.DEFAULT_TYPE) -> Optional[
     return channel_info.get("id")
 
 
+def log_admin_id_config_error(command: str, user_id: Optional[int]) -> None:
+    logger.error(
+        "[/%s] Invalid or missing ADMIN_ID configuration. "
+        "received_user_id=%s configured_ADMIN_ID=%r",
+        command,
+        user_id,
+        ADMIN_ID_RAW,
+    )
+
+
+async def ensure_owner_access(
+    command: str,
+    effective_message: Any,
+    user_id: Optional[int],
+) -> bool:
+    if ADMIN_ID is None:
+        log_admin_id_config_error(command, user_id)
+        await effective_message.reply_text(ADMIN_ID_CONFIG_ERROR_TEXT)
+        return False
+
+    if user_id is None:
+        logger.warning(
+            "[/%s] Access denied because executing user is unavailable. "
+            "executing_user_id=%s configured_ADMIN_ID=%s",
+            command,
+            user_id,
+            ADMIN_ID,
+        )
+        await effective_message.reply_text(
+            f"❌ Could not verify your user identity for /{command}.\n"
+            "Please run this command from a context where your Telegram user ID is visible to the bot."
+        )
+        return False
+
+    if user_id != ADMIN_ID:
+        logger.warning(
+            "[/%s] Access denied. executing_user_id=%s configured_ADMIN_ID=%s",
+            command,
+            user_id,
+            ADMIN_ID,
+        )
+        await effective_message.reply_text("❌ Only the bot owner can use this command.")
+        return False
+
+    return True
+
+
 async def log_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log every incoming update for diagnostics."""
     update_id = update.update_id
@@ -158,16 +214,14 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     
     user_id = effective_user.id if effective_user else None
     logger.info(f"[/setchannel] Received from user {user_id} in chat {effective_message.chat.id}")
-    
-    # Only the bot owner can use this command
-    if user_id != ADMIN_ID:
-        logger.warning(f"[/setchannel] Unauthorized user {user_id} tried to use /setchannel")
-        await effective_message.reply_text("❌ Only the bot owner can use this command.")
+
+    if not await ensure_owner_access("setchannel", effective_message, user_id):
         return
     
+    # Only the bot owner can use this command
     chat = effective_message.chat
     logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
-    
+
     # Command must be used in a channel (group or supergroup)
     if chat.type not in (Chat.CHANNEL, Chat.SUPERGROUP, Chat.GROUP):
         logger.error(f"[/setchannel] Invalid chat type: {chat.type}. Supported: CHANNEL, SUPERGROUP, GROUP")
@@ -241,11 +295,8 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     user_id = effective_user.id if effective_user else None
     logger.info(f"[/channelinfo] Received from user {user_id}")
-    
-    # Only the bot owner can use this command
-    if user_id != ADMIN_ID:
-        logger.warning(f"[/channelinfo] Unauthorized user {user_id}")
-        await effective_message.reply_text("❌ Only the bot owner can use this command.")
+
+    if not await ensure_owner_access("channelinfo", effective_message, user_id):
         return
     
     target = STORE.get("target_channel")
@@ -311,6 +362,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await send_private_channel_invoice(chat_id, context)
 
 
+async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Temporary helper command to show caller Telegram user id."""
+    effective_message = update.effective_message
+    effective_user = update.effective_user
+    if not effective_message:
+        return
+    if not effective_user:
+        await effective_message.reply_text("❌ Could not determine your Telegram user ID in this chat.")
+        return
+    await effective_message.reply_text(f"🆔 {effective_user.id}")
+
+
 async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send the Telegram Stars payment invoice (1800 ⭐) as the payment button."""
     try:
@@ -321,7 +384,7 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice(f"Pay ⭐{PRIVATE_CHANNEL_STARS_AMOUNT}", PRIVATE_CHANNEL_STARS_AMOUNT)],
+            prices=[LabeledPrice("Subscription", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
@@ -507,6 +570,10 @@ def main() -> None:
     
     # Message/Channel post command handlers
     application.add_handler(CommandHandler("start", start))
+    if ENABLE_MYID_COMMAND:
+        application.add_handler(CommandHandler("myid", myid))
+    else:
+        logger.info("Skipping /myid command registration (ENABLE_MYID_COMMAND disabled)")
     application.add_handler(CommandHandler("setchannel", setchannel))
     application.add_handler(CommandHandler("channelinfo", channelinfo))
     
