@@ -39,6 +39,7 @@ def get_env_int(name: str, *aliases: str, default: int) -> int:
 BOT_TOKEN = get_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN", "TELEGRAM_TOKEN")
 ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
+INVOICE_ERROR_DEBUG = get_env("INVOICE_ERROR_DEBUG", "DEBUG_INVOICE_ERRORS").lower() in {"1", "true", "yes", "on"}
 
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 
@@ -338,7 +339,11 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     except Exception as e:
         logger.exception("SEND_INVOICE ERROR")
         try:
-            error_text = f"ERROR: {e}" if chat_id == ADMIN_ID else "❌ Payment system is temporarily unavailable. Please try again later."
+            error_text = (
+                f"ERROR: {e}"
+                if INVOICE_ERROR_DEBUG and chat_id == ADMIN_ID
+                else "❌ Payment system is temporarily unavailable. Please try again later."
+            )
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=error_text
