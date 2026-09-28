@@ -145,7 +145,10 @@ async def log_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Set the current channel as the target payment channel (admin-only).
+    """Set the current channel as the target payment channel.
+    
+    For private chats: Owner verification required (ADMIN_ID check)
+    For channels/groups: Bot admin verification only (no owner check needed)
     
     Usage: Send /setchannel inside the channel where the bot is an admin.
     """
@@ -156,19 +159,23 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         logger.warning("[/setchannel] No message object")
         return
     
-    user_id = effective_user.id if effective_user else None
-    logger.info(f"[/setchannel] Received from user {user_id} in chat {effective_message.chat.id}")
-    
-    # Only the bot owner can use this command
-    if user_id != ADMIN_ID:
-        logger.warning(f"[/setchannel] Unauthorized user {user_id} tried to use /setchannel")
-        await effective_message.reply_text("❌ Only the bot owner can use this command.")
-        return
-    
     chat = effective_message.chat
-    logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}")
+    user_id = effective_user.id if effective_user else None
     
-    # Command must be used in a channel (group or supergroup)
+    logger.info(f"[/setchannel] Chat type: {chat.type}, Chat ID: {chat.id}, Chat title: {chat.title}, User ID: {user_id}")
+    
+    # Check if this is a private chat
+    is_private_chat = chat.type == Chat.PRIVATE
+    
+    # For private chats, verify owner
+    if is_private_chat:
+        if user_id != ADMIN_ID:
+            logger.warning(f"[/setchannel] Unauthorized user {user_id} tried to use /setchannel in private chat")
+            await effective_message.reply_text("❌ Only the bot owner can use this command in private chats.")
+            return
+        logger.info(f"[/setchannel] Owner {user_id} verified in private chat")
+    
+    # For channels and groups, skip owner check and verify bot permissions
     if chat.type not in (Chat.CHANNEL, Chat.SUPERGROUP, Chat.GROUP):
         logger.error(f"[/setchannel] Invalid chat type: {chat.type}. Supported: CHANNEL, SUPERGROUP, GROUP")
         error_msg = (
@@ -215,7 +222,7 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     
     logger.info(f"[/setchannel] ✅ Channel saved: {channel_title} (ID: {chat.id})")
     
-    # Confirm to the owner
+    # Confirm to the channel
     channel_info = STORE["target_channel"]
     title = channel_info["title"]
     channel_id = channel_info["id"]
