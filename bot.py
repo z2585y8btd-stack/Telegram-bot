@@ -39,7 +39,7 @@ def get_env_int(name: str, *aliases: str, default: int) -> int:
 BOT_TOKEN = get_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN", "TELEGRAM_TOKEN")
 ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
-INVOICE_ERROR_DEBUG = get_env("INVOICE_ERROR_DEBUG", "DEBUG_INVOICE_ERRORS").lower() in {"1", "true", "yes", "on"}
+INVOICE_ERROR_DEBUG = (get_env("INVOICE_ERROR_DEBUG", "DEBUG_INVOICE_ERRORS") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
 
@@ -207,7 +207,7 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 "❌ The bot must have permission to manage invite links in this channel."
             )
             return
-    except Exception as e:
+    except Exception:
         logger.exception(f"[/setchannel] Failed to verify bot admin status in {chat.id}")
         await effective_message.reply_text(f"❌ Error verifying bot permissions: {e}")
         return
@@ -340,7 +340,7 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
         logger.exception("SEND_INVOICE ERROR")
         try:
             error_text = (
-                f"ERROR: {e}"
+                "ERROR logged: check bot logs for traceback details."
                 if INVOICE_ERROR_DEBUG and chat_id == ADMIN_ID
                 else "❌ Payment system is temporarily unavailable. Please try again later."
             )
