@@ -364,7 +364,15 @@ async def handle_pre_checkout_query(update: Update, context: ContextTypes.DEFAUL
 
 
 async def create_unique_invite_link(context: ContextTypes.DEFAULT_TYPE, channel_id: int, user_id: int) -> Optional[str]:
-    """Create a single-use invite link tied to one user."""
+    """Create a strict single-use invite link tied to exactly one user.
+
+    Security properties:
+    - member_limit=1 ensures Telegram itself rejects a second join attempt.
+    - The link is recorded in STORE bound to this user_id and channel_id, so a
+      later join event can be verified against the intended recipient.
+    - Every call creates a brand-new invite link; links are never reused across
+      payments or users.
+    """
     try:
         invite = await context.bot.create_chat_invite_link(
             chat_id=channel_id,
@@ -375,8 +383,15 @@ async def create_unique_invite_link(context: ContextTypes.DEFAULT_TYPE, channel_
             "user_id": user_id,
             "channel_id": channel_id,
             "revoked": False,
+            "used": False,
+            "created_at": str(__import__('datetime').datetime.now()),
         }
         save_store()
+
+        logger.info("[INVITE LINK CREATED]")
+        logger.info(f"Invite Link: {invite.invite_link}")
+        logger.info("Member Limit: 1")
+
         return invite.invite_link
     except Exception:
         logger.exception(f"Failed to create invite link for user {user_id}")
@@ -392,6 +407,8 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     user_id = message.from_user.id if message.from_user else None
     payment = message.successful_payment
 
+    logger.info("[PAYMENT SUCCESS]")
+    logger.info(f"User ID: {user_id}")
     logger.info(f"Payment received from user {user_id}: {payment.total_amount} XTR, ID: {payment.telegram_payment_charge_id}")
 
     if user_id:
@@ -431,6 +448,8 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
                 logger.exception("Failed to notify admin about missing target channel")
         return
 
+    # NOTE: A brand-new, unique invite link is created for every single successful
+    # payment. Links are never reused: one payment -> one invite link -> one user.
     invite_link = await create_unique_invite_link(context, channel_id, user_id) if user_id else None
 
     if invite_link:
@@ -439,7 +458,8 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
             "🎉 Your premium access is now active!\n"
             "📌 Click the link below to join the exclusive channel:\n\n"
             f"{invite_link}\n\n"
-            "💡 This link is personal and can only be used once."
+            "💡 This link is personal, valid for one use only, and will be revoked "
+            "immediately after you join."
         )
         await message.reply_text(success_message)
     else:
@@ -451,7 +471,18 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
 
 
 async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """When a user joins the channel via an invite link, revoke that link automatically."""
+    """When a user joins the channel via an invite link, verify and revoke that link.
+
+    Security properties enforced here:
+    - The join is matched against the invite link's bound user_id. If a
+      different user somehow joins via a link that wasn't issued to them
+      (e.g. link forwarding), this is logged as a security warning, and the
+      link is still revoked immediately to prevent any further use.
+    - The link is revoked right after the first successful join, so the
+      one-time-use guarantee holds even beyond Telegram's own member_limit=1
+      enforcement (defense in depth).
+    - Revocation is idempotent: if already revoked, we do nothing further.
+    """
     chat_member_update = update.chat_member
     if not chat_member_update:
         return
@@ -467,16 +498,34 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
     if not joined:
         return
 
+    joined_user_id = chat_member_update.new_chat_member.user.id
     invite_link = invite_link_obj.invite_link
+
+    logger.info("[USER JOINED]")
+    logger.info(f"User ID: {joined_user_id}")
+
     link_info = STORE["invite_links"].get(invite_link)
     if not link_info or link_info.get("revoked"):
         return
+
+    expected_user_id = link_info.get("user_id")
+    if expected_user_id is not None and joined_user_id != expected_user_id:
+        logger.warning(
+            f"[SECURITY WARNING] Invite link {invite_link} was issued to user "
+            f"{expected_user_id} but was used by user {joined_user_id}. "
+            "Revoking immediately to prevent further sharing."
+        )
+
+    link_info["used"] = True
 
     channel_id = link_info.get("channel_id") or chat_member_update.chat.id
     try:
         await context.bot.revoke_chat_invite_link(chat_id=channel_id, invite_link=invite_link)
         link_info["revoked"] = True
         save_store()
+
+        logger.info("[INVITE LINK REVOKED]")
+        logger.info(f"Invite Link: {invite_link}")
         logger.info(f"Revoked invite link for user {link_info.get('user_id')} after they joined")
     except Exception:
         logger.exception(f"Failed to revoke invite link {invite_link}")
