@@ -336,11 +336,11 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
-        logger.error(f"Failed to send invoice to {chat_id}: {e}")
+        logger.exception("SEND_INVOICE ERROR")
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="❌ Payment system is temporarily unavailable. Please try again later."
+                text=f"ERROR: {e}"
             )
         except Exception as fallback_error:
             logger.error(f"Failed to send fallback message: {fallback_error}")
