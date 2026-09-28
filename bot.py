@@ -310,21 +310,13 @@ async def channelinfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Default /start handler: send welcome message with payment button."""
+    """Default /start handler: send a minimal acknowledgment, then the payment button."""
     if not update.message:
         return
     chat_id = update.message.chat_id
     
-    # Send welcome message
-    welcome_text = (
-        "🎉 Welcome to Premium Access!\n\n"
-        "📌 Get instant access to exclusive content\n"
-        "💎 Unlock premium features\n"
-        "⭐ Enjoy unlimited benefits\n\n"
-        "Click the button below to proceed with payment."
-    )
-    
-    await update.message.reply_text(welcome_text)
+    # Minimal, neutral acknowledgment (no marketing language)
+    await update.message.reply_text("Accept✅\nPress the button below.")
     
     # Send the payment invoice
     await send_private_channel_invoice(chat_id, context)
@@ -335,12 +327,12 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     try:
         await context.bot.send_invoice(
             chat_id=chat_id,
-            title="🌟 Premium Channel Access",
-            description="Get exclusive access to premium content and features. One-time payment for lifetime access.",
+            title="Payment",
+            description="Payment of ⭐1,800.",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice(f"Premium Access - ⭐{PRIVATE_CHANNEL_STARS_AMOUNT}", PRIVATE_CHANNEL_STARS_AMOUNT)],
+            prices=[LabeledPrice(f"Pay ⭐{PRIVATE_CHANNEL_STARS_AMOUNT:,}", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
@@ -429,9 +421,9 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
     if not channel_id:
         logger.error("No target channel configured; payment flow stopped")
         await message.reply_text(
-            "✅ Payment successful!\n\n"
-            "⚠️ However, the invite link could not be generated at this moment.\n"
-            "Please contact support for assistance."
+            "✅ Payment received.\n\n"
+            "⚠️ The invite link could not be generated at this moment.\n"
+            "Please contact support."
         )
         if ADMIN_ID:
             try:
@@ -454,18 +446,15 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
 
     if invite_link:
         success_message = (
-            "✅ Payment Successful!\n\n"
-            "🎉 Your premium access is now active!\n"
-            "📌 Click the link below to join the exclusive channel:\n\n"
+            "✅ Payment received.\n\n"
             f"{invite_link}\n\n"
-            "💡 This link is personal, valid for one use only, and will be revoked "
-            "immediately after you join."
+            "This link works once and will be revoked after use."
         )
         await message.reply_text(success_message)
     else:
         await message.reply_text(
-            "✅ Payment received successfully!\n\n"
-            "❌ Unfortunately, the invite link could not be created.\n"
+            "✅ Payment received.\n\n"
+            "❌ The invite link could not be created.\n"
             "Please try again or contact support."
         )
 
