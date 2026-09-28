@@ -207,7 +207,7 @@ async def setchannel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 "❌ The bot must have permission to manage invite links in this channel."
             )
             return
-    except Exception:
+    except Exception as e:
         logger.exception(f"[/setchannel] Failed to verify bot admin status in {chat.id}")
         await effective_message.reply_text(f"❌ Error verifying bot permissions: {e}")
         return
