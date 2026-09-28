@@ -336,7 +336,7 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
             prices=[LabeledPrice(f"Pay ⭐{PRIVATE_CHANNEL_STARS_AMOUNT:,}", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
-    except Exception as e:
+    except Exception:
         logger.exception("SEND_INVOICE ERROR")
         try:
             await context.bot.send_message(
@@ -349,7 +349,7 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
             try:
                 await context.bot.send_message(
                     chat_id=ADMIN_ID,
-                    text=f"SEND_INVOICE ERROR for chat {chat_id}: {type(e).__name__}: {e}",
+                    text=f"SEND_INVOICE ERROR for chat {chat_id}. Check bot logs for traceback details.",
                 )
             except Exception:
                 logger.exception("Failed to send admin invoice error notification")
