@@ -327,8 +327,8 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     try:
         await context.bot.send_invoice(
             chat_id=chat_id,
-            title="Private Channel",
-            description="🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟",
+            title="🌟🌟🌟🌟🌟🌟🌟🌟🌟🍌🌟🌟🌟🌟🌟🌟🌟🌟",
+            description="🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
