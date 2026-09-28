@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-from telegram import Chat, Update, LabeledPrice, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Chat, Update, LabeledPrice
 from telegram.ext import (
     Application, ChatMemberHandler, CommandHandler, ContextTypes,
     PreCheckoutQueryHandler, MessageHandler, filters, TypeHandler,
@@ -327,20 +327,20 @@ async def send_private_channel_invoice(chat_id: int, context: ContextTypes.DEFAU
     try:
         await context.bot.send_invoice(
             chat_id=chat_id,
-            title="Payment",
-            description="Payment of ⭐1,800.",
+            title="Private Channel",
+            description="Premium Access",
             payload="private_channel_subscription",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice(f"Pay ⭐{PRIVATE_CHANNEL_STARS_AMOUNT:,}", PRIVATE_CHANNEL_STARS_AMOUNT)],
+            prices=[LabeledPrice("Channel Access", PRIVATE_CHANNEL_STARS_AMOUNT)],
         )
         logger.info(f"Invoice sent to user {chat_id} for private channel subscription")
     except Exception as e:
-        logger.error(f"Failed to send invoice to {chat_id}: {e}")
+        logger.exception("SEND_INVOICE ERROR")
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="❌ Payment system is temporarily unavailable. Please try again later."
+                text=f"⚠️ ERROR: {e}"
             )
         except Exception as fallback_error:
             logger.error(f"Failed to send fallback message: {fallback_error}")
