@@ -37,7 +37,7 @@ def get_env_int(name: str, *aliases: str, default: int) -> int:
 
 
 BOT_TOKEN = get_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN", "TELEGRAM_TOKEN")
-ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8561249287)
+ADMIN_ID = get_env_int("BOT_ADMIN_ID", "ADMIN_ID", default=8893176204)
 USER_STORE_FILE = Path(get_env("USER_STORE_FILE", "BOT_USER_STORE_FILE") or "bot_users.json")
 
 PRIVATE_CHANNEL_STARS_AMOUNT = 1800
